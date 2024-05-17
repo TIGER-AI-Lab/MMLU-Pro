@@ -6,15 +6,14 @@ This repository contains the evaluation code for MMLU-Pro, which includes method
 
 ### Local Inference
 
-To run local inference, follow these steps:
+To run local inference:
 
 ```bash
 cd scripts/example/
 sh eval_llama_2_7b.sh
 ```
 
-Using the API
-To use the API for inference, follow these steps:
+To use the API for inference:
 
 ```bash
 cd scripts/example/
