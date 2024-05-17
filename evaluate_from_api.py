@@ -7,12 +7,12 @@ from tqdm import tqdm
 import time
 from datasets import load_dataset
 
-API_KEY = '786f8c1ff30a4c4b9f9b8917f2f5191b'
+API_KEY = 'API_KEY'
 
 my_client = AzureOpenAI(
-  azure_endpoint="https://waterloo-gpt4.openai.azure.com/",
+  azure_endpoint="API_BASE",
   api_key=API_KEY,
-  api_version="2024-02-15-preview"
+  api_version="API_VERSION"
 )
 
 
