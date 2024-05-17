@@ -223,7 +223,6 @@ def eval_cot(subject, model, tokenizer, val_df, test_df, output_path, exists_res
 
 def main():
     model, tokenizer = load_model()
-    model.eval()
     if not os.path.exists(save_result_dir):
         os.makedirs(save_result_dir)
 
