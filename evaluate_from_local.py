@@ -81,9 +81,11 @@ def format_cot_example(example, including_answer=True):
     for i, opt in enumerate(options):
         prompt += "{}. {}\n".format(choices[i], opt)
     if including_answer:
-        prompt += example["cot_content"] + "\n\n"
+        cot_content = example["cot_content"].replace("A: Let's think step by step.",
+                                                     "Answer: Let's think step by step.")
+        prompt += cot_content + "\n\n"
     else:
-        prompt += "A: Let's think step by step."
+        prompt += "Answer: Let's think step by step."
     return prompt
 
 
@@ -175,7 +177,6 @@ def eval_cot(subject, model, tokenizer, val_df, test_df, output_path, exists_res
     logging.info("evaluating " + subject)
     batch_size = args.batch_size
     inference_batches = []
-    label_batches = []
     in_batch_index = []
 
     for i in tqdm(range(len(test_df))):
