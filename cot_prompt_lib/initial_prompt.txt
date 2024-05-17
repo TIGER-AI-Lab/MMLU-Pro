@@ -1,0 +1,1 @@
+You are an expert in {$}. Below is a series of example questions (with answers) about {$} for demonstration. You will be given a question at the end, after the examples, for you to answer. First give step-by-step reasoning about how to solve the question. Then output the answer.
