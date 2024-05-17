@@ -146,9 +146,12 @@ def update_result(output_res_path):
     return res, category_record
 
 
-def evaluate():
+def evaluate(subjects):
     test_df, dev_df = load_mmlu_pro()
-    for subject in assigned_subject:
+    if not subjects:
+        subjects = list(test_df.keys())
+    print("assigned subjects", subjects)
+    for subject in subjects:
         test_data = test_df[subject]
         output_res_path = os.path.join(output_dir, subject + "_result.json")
         output_summary_path = os.path.join(output_dir, subject + "_summary.json")
@@ -215,5 +218,5 @@ if __name__ == '__main__':
     assigned_subject = []
     output_dir = "eval_results/gpt-4-results_from_api"
     os.makedirs(output_dir, exist_ok=True)
-    evaluate()
+    evaluate(assigned_subject)
 
