@@ -213,7 +213,7 @@ def eval_cot(subject, model, tokenizer, val_df, test_df, output_path, exists_res
         for j, index in enumerate(index_list):
             curr = test_df[index]
             curr["pred"] = pred_batch[j]
-            curr["generated_text"] = response_batch[j]
+            curr["model_outputs"] = response_batch[j]
             res.append(curr)
         accu, corr, wrong = save_res(res, output_path)
         logging.info("this batch accu is: {}, corr: {}, wrong: {}\n".format(str(accu), str(corr), str(wrong)))

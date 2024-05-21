@@ -91,7 +91,7 @@ def single_request_gpt4(single_question, cot_examples_dict, exist_result):
     for each in exist_result:
         if q_id == each["question_id"] and single_question["question"] == each["question"]:
             print("already exists, skip it")
-            return each["pred"], each["gpt_4_response"], exist
+            return each["pred"], each["model_outputs"], exist
     exist = False
     category = single_question["category"]
     cot_examples = cot_examples_dict[category]
@@ -168,7 +168,7 @@ def evaluate(subjects):
                 if category not in category_record:
                     category_record[category] = {"corr": 0.0, "wrong": 0.0}
                 each["pred"] = pred
-                each["gpt_4_response"] = response
+                each["model_outputs"] = response
                 res.append(each)
                 if pred is not None:
                     if pred == label:
