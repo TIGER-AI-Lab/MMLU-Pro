@@ -252,7 +252,7 @@ def main():
             sta_dict[subject] = {"corr": 0.0, "wrong": 0.0, "accu": 0.0}
         test_df = select_by_category(full_test_df, subject)
         val_df = select_by_category(full_val_df, subject)
-        output_path = os.path.join(save_result_dir, "{}".format(subject))
+        output_path = os.path.join(save_result_dir, "{}.json".format(subject))
         if os.path.exists(output_path):
             with open(output_path, "r") as fi:
                 exists_result = json.load(fi)
