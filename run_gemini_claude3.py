@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model", default='pro', type=str)
 parser.add_argument("--thread", default=40, type=int)
 parser.add_argument("--shots", default=0, type=int)
+parser.add_argument("--prompt", default='gdm', type=str)
 parser.add_argument("--tiny", action='store_true', default=False)
 args = parser.parse_args()
 
@@ -27,7 +28,7 @@ if args.model in ['pro', 'flash']:
   print('setting up Gemini evaluation')
   genai.configure(api_key=os.environ["GEMINI_API_KEY"])
   generation_config = {
-    "temperature": 0.1,
+    "temperature": 0.0,
     "top_p": 0.95,
     "top_k": 64,
     "max_output_tokens": 1000,
@@ -57,7 +58,7 @@ if args.model in ['pro', 'flash']:
     generation_config=generation_config,
   )
 elif args.model in ['opus', 'sonnet']:
-  print('setting up Calude3 evaluation')
+  print('setting up Claude3 evaluation')
   client = anthropic.Anthropic(
       api_key=os.environ["CLAUDE_API_KEY"],
   )
@@ -74,28 +75,28 @@ def form_options(options: list):
 
 
 def get_prediction(output):
-  pattern = r'answer is \(?([ABCDEFGHIJ])\)?'
+  #pattern = r'answer is \(?([ABCDEFGHIJ])\)?'
+  pattern = r"(Answer:|answer is)\s*\(?([ABCDEFGHIJ])\)?"
   match = re.search(pattern, output)
   if match:
-    return match.group(1)
+    return match.group(2)
   else:
-    pattern = r' is \(?([ABCDEFGHIJ])\)?\b'
+    pattern = r' (:|is)\s*\(?([ABCDEFGHIJ])\)?\b'
     match = re.search(pattern, output)
     if match:
-      return match.group(1)
+      return match.group(2)
     else:
       print('extraction failed, do a random guess')
       return random.choice(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'])
 
 
 def run_one_question(question: str):
+  count = 0
+  max_trials = 10
   if args.model in ['pro', 'flash']:
     chat_session = model.start_chat(
       history=[]
     )
-
-    max_trials = 10
-    count = 0
     while True:
       try:
         response = chat_session.send_message(question)
@@ -110,41 +111,58 @@ def run_one_question(question: str):
         else:
           return f'Exception: {e}'
 
-    try:
-      return response.text
-    except Exception:
-      print('failed to give results!')
-      return 'The answer is A'
-
   elif args.model in ['opus', 'sonnet']:
-    message = client.messages.create(
-        model=f"claude-3-{args.model}-20240229",
-        max_tokens=1024,
-        system="",
-        messages=[
-            {"role": "user", "content": question}
-        ],
-        temperature = 0.1,
-        top_p = 1,
-    )
-    return message.content[0].text
+    while True:
+      try:
+        message = client.messages.create(
+            model=f"claude-3-{args.model}-20240229",
+            max_tokens=1024,
+            system="",
+            messages=[
+                {"role": "user", "content": question}
+            ],
+            temperature = 0.0,
+            top_p = 1,
+        )
+        response = message.content[0]
+        break
+      except Exception:
+        count += 1
+        if count >= max_trials:
+          break
+        else:
+          time.sleep(5)
   else:
     raise NotImplementedError(args.model)
+  
+  try:
+    return response.text
+  except Exception:
+    print('failed to give results!')
+    return 'The answer is (A)'
 
 categories = ['computer science', 'math', 'chemistry', 'engineering', 'law', 'biology',
               'health', 'physics', 'business', 'philosophy', 'economics', 'other',
               'psychology', 'history']
 
-prompts = {c: '' for c in categories}
-for d in datasets.load_dataset('TIGER-Lab/MMLU-Pro', split='validation'):
-  prompts[d['category']] += 'Q:' + ' ' + d['question'] + '\n' + form_options(d['options']) + '\n' + d['cot_content'] + '\n\n'
+prompts = {}
+for c in categories:
+  prompts[c] = ''
+  count = 0
+  for d in datasets.load_dataset('TIGER-Lab/MMLU-Pro', split='validation'):
+    if d['category'] == c and count < args.shots:
+      prompts[d['category']] += d['question'] + '\n' + form_options(d['options']) + '\n' + d['cot_content'] + '\n\n'
+      count += 1
 
 
 def func(line):
-  #system_prompt = "You are an expert in solving exam problems. Here, you are supposed to answer a multi-choice question and choose the most accurate option. You need to show the reasoning steps and to derive the final answer as `The answer is (A)/(B)/(C)/(D)/(E)/(F)/(G)/(H)/(I)/(J)`.\n\n"
-  system_prompt = "Finish your answer with `the answer is (X)' where X is the correct letter choice. If none or more than one of the options match, choose the one that is the closest.\n\n"
-  prefix = prompts[line['category']][:args.shots]
-  query = system_prompt + prefix + 'Q: ' + line['question'] + '\n' + form_options(line['options']) + '\n'
+  if args.prompt == 'gdm':
+    system_prompt = "Finish your answer with Final Answer: (X) where X is the correct letter choice. If none or more than one of the options match, choose the one that is the closest.\n\n"
+  else:
+    system_prompt = "Finish your answer with the answer is (X) where X is the correct letter choice. If none or more than one of the options match, choose the one that is the closest.\n\n"
+
+  prefix = prompts[line['category']]
+  query = system_prompt + prefix + line['question'] + '\n' + form_options(line['options']) + '\n'
 
   solution = run_one_question(query)
   solution = solution.replace('**', '')
@@ -166,7 +184,6 @@ if __name__ == "__main__":
   if args.tiny:
     dataset = dataset[:400]
 
-  dataset = dataset[10400:]
   if args.thread == 1:
     results = []
     for d in tqdm.tqdm(dataset):
