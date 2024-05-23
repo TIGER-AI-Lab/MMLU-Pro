@@ -2,3 +2,8 @@
 !.gitignore
 !.gitattributes
 local/
+local_0520/
+local_0520_yi_large/
+local_inference_0520/
+local_0520_gpt_4/
+local_evaluate_wenxin/

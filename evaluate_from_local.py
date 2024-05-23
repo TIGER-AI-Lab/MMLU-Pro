@@ -18,8 +18,8 @@ import sys
 from datasets import load_dataset
 
 choices = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"]
-max_model_length = 2048
-max_new_tokens = 256
+max_model_length = 4096
+max_new_tokens = 2048
 
 
 def load_mmlu_pro():
@@ -33,9 +33,9 @@ def load_mmlu_pro():
 def load_model():
     try:
         llm = LLM(model=args.model, gpu_memory_utilization=float(args.gpu_util),
-                  tensor_parallel_size=args.ngpu, max_model_len=4096,
+                  tensor_parallel_size=args.ngpu, max_model_len=max_model_length,
                   trust_remote_code=True)
-        sampling_params = SamplingParams(temperature=0, max_tokens=256,
+        sampling_params = SamplingParams(temperature=0, max_tokens=max_new_tokens,
                                          stop=["Question:"])
         tokenizer = transformers.AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     except Exception as e:
@@ -124,7 +124,15 @@ def extract_answer(text):
     if match:
         return match.group(1)
     else:
-        logging.info("answer extract failed\n" + text)
+        logging.info("1st answer extract failed\n" + text)
+        return extract_again(text)
+
+
+def extract_again(text):
+    match = re.search(r'.*[aA]nswer:\s*([A-J])', text)
+    if match:
+        return match.group(1)
+    else:
         return None
 
 
