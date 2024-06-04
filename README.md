@@ -19,14 +19,14 @@ MMLU-Pro was created to provide language models with a more challenging and robu
 To run local inference, modify the model name in the following script and execute it:
 
 ```bash
-cd scripts/example/
+cd scripts/examples/
 sh eval_llama_2_7b.sh
 ```
 
 To use the API for inference, modify the API KEY and client creation in the following script and execute it:
 
 ```bash
-cd scripts/example/
+cd scripts/examples/
 sh eval_gpt_4.sh
 ```
 ## 🏆 Mini-Leaderboard
