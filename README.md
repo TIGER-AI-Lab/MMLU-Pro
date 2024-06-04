@@ -51,4 +51,21 @@ sh eval_gpt_4.sh
 
 For more details on various models and their accuracy across different subjects, please visit our [**Leaderboard**](https://huggingface.co/spaces/TIGER-Lab/MMLU-Pro).
 
+## Contact
+- Yubo Wang: y726wang@uwaterloo.ca
+- Xueguang Ma: x93ma@uwaterloo.ca
+- Wenhu Chen: wenhuchen@uwaterloo.ca
 
+## Citation
+
+**BibTeX:**
+```bibtex
+@misc{wang2024mmlupro,
+      title={MMLU-Pro: A More Robust and Challenging Multi-Task Language Understanding Benchmark}, 
+      author={Yubo Wang and Xueguang Ma and Ge Zhang and Yuansheng Ni and Abhranil Chandra and Shiguang Guo and Weiming Ren and Aaran Arulraj and Xuan He and Ziyan Jiang and Tianle Li and Max Ku and Kai Wang and Alex Zhuang and Rongqi Fan and Xiang Yue and Wenhu Chen},
+      year={2024},
+      eprint={2406.01574},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+```
