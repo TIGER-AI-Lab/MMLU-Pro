@@ -76,12 +76,20 @@ def format_example(question, options, cot_content=""):
 
 
 def extract_answer(text):
-    pattern = r"answer is \(?([ABCDEFGHIJ])\)?"
+    pattern = r"answer is \(?([A-J])\)?"
     match = re.search(pattern, text)
     if match:
         return match.group(1)
     else:
-        print("extraction failed:\n", text)
+        print("1st answer extract failed\n" + text)
+        return extract_again(text)
+
+
+def extract_again(text):
+    match = re.search(r'.*[aA]nswer:\s*([A-J])', text)
+    if match:
+        return match.group(1)
+    else:
         return None
 
 
