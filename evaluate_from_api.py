@@ -90,6 +90,15 @@ def extract_again(text):
     if match:
         return match.group(1)
     else:
+        return extract_final(text)
+
+
+def extract_final(text):
+    pattern = r"[A-J](?=[^A-J]*$)"
+    match = re.search(pattern, text)
+    if match:
+        return match.group(0)
+    else:
         return None
 
 
@@ -98,8 +107,8 @@ def single_request_gpt4(single_question, cot_examples_dict, exist_result):
     q_id = single_question["question_id"]
     for each in exist_result:
         if q_id == each["question_id"] and single_question["question"] == each["question"]:
-            print("already exists, skip it")
-            return each["pred"], each["model_outputs"], exist
+            pred = extract_answer(each["model_outputs"])
+            return pred, each["model_outputs"], exist
     exist = False
     category = single_question["category"]
     cot_examples = cot_examples_dict[category]
@@ -140,7 +149,7 @@ def update_result(output_res_path):
                             x = random.randint(0, len(each["options"]) - 1)
                             if x == each["answer_index"]:
                                 category_record[category]["corr"] += 1
-                                print("random hit.")
+                                # print("random hit.")
                             else:
                                 category_record[category]["wrong"] += 1
                         elif each["pred"] == each["answer"]:
@@ -152,6 +161,17 @@ def update_result(output_res_path):
             print("Error", e, "sleep 2 seconds")
             time.sleep(2)
     return res, category_record
+
+
+def merge_result(res, curr):
+    merged = False
+    for i, single in enumerate(res):
+        if single["question_id"] == curr["question_id"] and single["question"] == curr["question"]:
+            res[i] = curr
+            merged = True
+    if not merged:
+        res.append(curr)
+    return res
 
 
 def evaluate(subjects):
@@ -169,15 +189,15 @@ def evaluate(subjects):
             label = each["answer"]
             category = subject
             pred, response, exist = single_request_gpt4(each, dev_df, res)
-            if exist:
-                continue
+            # if exist:
+            #     continue
             if response is not None:
                 res, category_record = update_result(output_res_path)
                 if category not in category_record:
                     category_record[category] = {"corr": 0.0, "wrong": 0.0}
                 each["pred"] = pred
                 each["model_outputs"] = response
-                res.append(each)
+                merge_result(res, each)
                 if pred is not None:
                     if pred == label:
                         category_record[category]["corr"] += 1
