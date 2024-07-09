@@ -19,7 +19,7 @@ def get_completion(prompt: str):
         messages=[
             {
                 "role": "system",
-                "content": "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
+                "content": "You are an expert problem solver, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
             },
             {
                 "role": "user",
