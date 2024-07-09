@@ -1,36 +1,104 @@
 import os
 from openai import AzureOpenAI
+import openai
+from openai import OpenAI
+import anthropic
+import google.generativeai as genai
 import json
 import re
 import random
 from tqdm import tqdm
 import time
 from datasets import load_dataset
+import argparse
 
-API_KEY = 'API_KEY'
-
-my_client = AzureOpenAI(
-  azure_endpoint="API_BASE",
-  api_key=API_KEY,
-  api_version="API_VERSION"
-)
+API_KEY = "Put your api key here"
 
 
-def call_gpt_4(client, instruction, inputs):
+def get_client():
+    if args.model_name in ["gpt-4", "gpt-4o"]:
+        openai.api_key = API_KEY
+        client = openai
+    elif args.model_name in ["deepseek-chat", "deepseek-coder"]:
+        client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com/")
+    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]:
+        genai.configure(api_key=API_KEY)
+        generation_config = {
+            "temperature": 0.0,
+            "top_p": 1,
+            "max_output_tokens": 4000,
+            "response_mime_type": "text/plain",
+        }
+        safety_settings = [
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_NONE",
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_NONE",
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_NONE",
+            },
+            {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_NONE",
+            },
+        ]
+        client = genai.GenerativeModel(
+            model_name=args.model_name,
+            safety_settings=safety_settings,
+            generation_config=generation_config,
+        )
+    elif args.model_name in ["claude-3-opus-20240229", "claude-3-sonnet-20240229"]:
+        client = anthropic.Anthropic(
+            api_key=API_KEY,
+        )
+    else:
+        client = None
+        print("For other model API calls, please implement the client definition method yourself.")
+    return client
+
+
+def call_api(client, instruction, inputs):
     start = time.time()
-    message_text = [{"role": "user", "content": instruction + inputs}]
-    completion = client.chat.completions.create(
-      model="gpt-4",
-      messages=message_text,
-      temperature=0,
-      max_tokens=4000,
-      top_p=1,
-      frequency_penalty=0,
-      presence_penalty=0,
-      stop=None
-    )
+    if args.model_name in ["gpt-4", "gpt-4o", "deepseek-chat", "deepseek-coder"]:
+        message_text = [{"role": "user", "content": instruction + inputs}]
+        completion = client.chat.completions.create(
+          model=args.model_name,
+          messages=message_text,
+          temperature=0,
+          max_tokens=4000,
+          top_p=1,
+          frequency_penalty=0,
+          presence_penalty=0,
+          stop=None
+        )
+        result = completion.choices[0].message.content
+    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]:
+        chat_session = client.start_chat(
+            history=[]
+        )
+        result = chat_session.send_message(instruction + inputs).text
+    elif args.model_name in ["claude-3-opus-20240229", "claude-3-sonnet-20240229"]:
+        message = client.messages.create(
+            model=args.model_name,
+            max_tokens=4000,
+            system="",
+            messages=[
+                {"role": "user", "content": instruction + inputs}
+            ],
+            temperature=0.0,
+            top_p=1,
+        )
+        result = message.content[0]
+    else:
+        print("For other model API calls, please implement the request method yourself.")
+        result = None
     print("cost time", time.time() - start)
-    return completion.choices[0].message.content
+    return result
 
 
 def load_mmlu_pro():
@@ -102,7 +170,7 @@ def extract_final(text):
         return None
 
 
-def single_request_gpt4(single_question, cot_examples_dict, exist_result):
+def single_request(client, single_question, cot_examples_dict, exist_result):
     exist = True
     q_id = single_question["question_id"]
     for each in exist_result:
@@ -122,7 +190,7 @@ def single_request_gpt4(single_question, cot_examples_dict, exist_result):
     input_text = format_example(question, options)
     try:
         start = time.time()
-        response = call_gpt_4(my_client, prompt, input_text)
+        response = call_api(client, prompt, input_text)
         print("requesting gpt 4 costs: ", time.time() - start)
     except Exception as e:
         print("error", e)
@@ -175,20 +243,21 @@ def merge_result(res, curr):
 
 
 def evaluate(subjects):
+    client = get_client()
     test_df, dev_df = load_mmlu_pro()
     if not subjects:
         subjects = list(test_df.keys())
     print("assigned subjects", subjects)
     for subject in subjects:
         test_data = test_df[subject]
-        output_res_path = os.path.join(output_dir, subject + "_result.json")
-        output_summary_path = os.path.join(output_dir, subject + "_summary.json")
+        output_res_path = os.path.join(args.output_dir, subject + "_result.json")
+        output_summary_path = os.path.join(args.output_dir, subject + "_summary.json")
         res, category_record = update_result(output_res_path)
 
         for each in tqdm(test_data):
             label = each["answer"]
             category = subject
-            pred, response, exist = single_request_gpt4(each, dev_df, res)
+            pred, response, exist = single_request(client, each, dev_df, res)
             # if exist:
             #     continue
             if response is not None:
@@ -242,9 +311,23 @@ def save_summary(category_record, output_summary_path):
         fo.write(json.dumps(category_record))
 
 
-if __name__ == '__main__':
-    assigned_subject = []
-    output_dir = "eval_results/gpt-4-results_from_api"
-    os.makedirs(output_dir, exist_ok=True)
-    evaluate(assigned_subject)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output_dir", "-o", type=str, default="eval_results/")
+    parser.add_argument("--model_name", "-m", type=str, default="gpt-4",
+                        choices=["gpt-4", "gpt-4o", "deepseek-chat", "deepseek-coder",
+                                 "gemini-1.5-flash-latest", "gemini-1.5-pro-latest",
+                                 "claude-3-opus-20240229", "claude-3-sonnet-20240229"])
+    parser.add_argument("--assigned_subjects", "-a", type=str, default="all")
+    assigned_subjects = []
+    args = parser.parse_args()
+    args.model_name = "gpt-4o"
+
+    if args.assigned_subjects == "all":
+        assigned_subjects = []
+    else:
+        assigned_subjects = args.assigned_subjects.split(",")
+    os.makedirs(args.output_dir, exist_ok=True)
+    evaluate(assigned_subjects)
+
 

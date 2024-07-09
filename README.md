@@ -23,7 +23,7 @@ cd scripts/examples/
 sh eval_llama_2_7b.sh
 ```
 
-To use the API for inference, modify the API KEY and client creation in the following script and execute it:
+To use the API for inference, modify the API KEY in evaluate_from_api.py script and execute the bash script:
 
 ```bash
 cd scripts/examples/

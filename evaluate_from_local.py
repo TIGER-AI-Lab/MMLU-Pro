@@ -119,12 +119,12 @@ def check_exist(res, q_id):
 
 
 def extract_answer(text):
-    pattern = r"answer is \(?([ABCDEFGHIJ])\)?"
+    pattern = r"answer is \(?([A-J])\)?"
     match = re.search(pattern, text)
     if match:
         return match.group(1)
     else:
-        logging.info("1st answer extract failed\n" + text)
+        print("1st answer extract failed\n" + text)
         return extract_again(text)
 
 
@@ -132,6 +132,15 @@ def extract_again(text):
     match = re.search(r'.*[aA]nswer:\s*([A-J])', text)
     if match:
         return match.group(1)
+    else:
+        return extract_final(text)
+
+
+def extract_final(text):
+    pattern = r"[A-J](?=[^A-J]*$)"
+    match = re.search(pattern, text)
+    if match:
+        return match.group(0)
     else:
         return None
 
@@ -299,7 +308,7 @@ if __name__ == "__main__":
     parser.add_argument("--global_record_file", "-grf", type=str,
                         default="eval_record_collection.csv")
     parser.add_argument("--gpu_util", "-gu", type=str, default="0.8")
-    parser.add_argument("--batch_size", "-bs", type=int, default=64)
+    parser.add_argument("--batch_size", "-bs", type=int, default=1024)
     parser.add_argument("--model", "-m", type=str, default="meta-llama/Llama-2-7b-hf")
 
     args = parser.parse_args()
