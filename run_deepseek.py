@@ -16,7 +16,7 @@ client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com/")
 
 def get_completion(prompt: str):
     start = time.time()
-    system_prompt = "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
+    system_prompt = "As an expert problem solver, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
     message_text=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
     completion = client.chat.completions.create(
         model="deepseek-chat",
