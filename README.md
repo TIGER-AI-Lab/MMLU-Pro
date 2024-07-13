@@ -32,6 +32,7 @@ sh eval_gpt_4.sh
 ## 🏆 Mini-Leaderboard
 | Model                          | Overall Accuracy | 
 |--------------------------------|:----------------:|
+| Claude-3.5-Sonnet              | 72.83            |
 | GPT-4o                         | 72.55            | 
 | Gemini-1.5-Pro                 | 69.03            |
 | Claude-3-Opus                  | 68.45            |
@@ -50,6 +51,12 @@ sh eval_gpt_4.sh
 | MAmmoTH2-8x7B-Plus             | 50.40            |
 
 For more details on various models and their accuracy across different subjects, please visit our [**Leaderboard**](https://huggingface.co/spaces/TIGER-Lab/MMLU-Pro).
+
+## Benchmarking Answer Extraction
+We provide different alternatives to do answer extraction. We found that different answer extraction mechanisms have minor impact on the results.
+```
+python compute_accuracy.py results/llama-3-8b-quantized/CoT/all/
+```
 
 ## Contact
 - Yubo Wang: y726wang@uwaterloo.ca
