@@ -101,20 +101,6 @@ def generate_cot_prompt(val_df, curr, k):
     return prompt
 
 
-def check_exist(res, q_id):
-    for each in res:
-        if q_id == each["question_id"]:
-            if "pred" in each:
-                # logging.debug("exist, skip it")
-                return True
-            else:
-                logging.debug("no result in exist result error")
-                return False
-        else:
-            continue
-    return False
-
-
 def extract_answer(text):
     pattern = r"answer is \(?([A-J])\)?"
     match = re.search(pattern, text)
