@@ -3,16 +3,12 @@ import json
 import argparse
 import os
 import torch
-import numpy as np
 import random
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-from transformers import AutoModelForCausalLM
 import transformers
 import time
 import re
 from vllm import LLM, SamplingParams
 from tqdm import tqdm
-from distutils.util import strtobool
 import logging
 import sys
 from datasets import load_dataset
