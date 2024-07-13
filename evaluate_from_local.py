@@ -31,16 +31,13 @@ def load_mmlu_pro():
 
 
 def load_model():
-    try:
-        llm = LLM(model=args.model, gpu_memory_utilization=float(args.gpu_util),
-                  tensor_parallel_size=args.ngpu, max_model_len=max_model_length,
-                  trust_remote_code=True)
-        sampling_params = SamplingParams(temperature=0, max_tokens=max_new_tokens,
-                                         stop=["Question:"])
-        tokenizer = transformers.AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    except Exception as e:
-        print("vllm unsupported models", e)
-        return None, None
+    llm = LLM(model=args.model, gpu_memory_utilization=float(args.gpu_util),
+                tensor_parallel_size=torch.cuda.device_count(),
+                max_model_len=max_model_length,
+                trust_remote_code=True)
+    sampling_params = SamplingParams(temperature=0, max_tokens=max_new_tokens,
+                                        stop=["Question:"])
+    tokenizer = transformers.AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     return (llm, sampling_params), tokenizer
 
 
@@ -183,28 +180,15 @@ def save_res(res, output_path):
 
 
 @torch.no_grad()
-def eval_cot(subject, model, tokenizer, val_df, test_df, output_path, exists_result=None):
+def eval_cot(subject, model, tokenizer, val_df, test_df, output_path):
     llm, sampling_params = model
-    if not exists_result:
-        res = []
-    else:
-        res = exists_result
-    print("load exists result length", len(res))
     global choices
     logging.info("evaluating " + subject)
-    batch_size = args.batch_size
     inference_batches = []
-    in_batch_index = []
 
     for i in tqdm(range(len(test_df))):
         k = args.ntrain
-        options_num = len(test_df[i]["options"])
-        if options_num != 10 and options_num != 4:
-            print("options_num", options_num)
         curr = test_df[i]
-        q_id = curr["question_id"]
-        if check_exist(res, q_id):
-            continue
         prompt_length_ok = False
         prompt = None
         while not prompt_length_ok:
@@ -216,25 +200,16 @@ def eval_cot(subject, model, tokenizer, val_df, test_df, output_path, exists_res
                 prompt_length_ok = True
             k -= 1
         inference_batches.append(prompt)
-        in_batch_index.append(i)
 
-    i = 0
-    while i < len(test_df):
-        if i + batch_size < len(test_df):
-            end_index = i + batch_size
-        else:
-            end_index = len(test_df)
-        curr_batch = inference_batches[i: end_index]
-        pred_batch, response_batch = batch_inference(llm, sampling_params, curr_batch)
-        index_list = in_batch_index[i: end_index]
-        for j, index in enumerate(index_list):
-            curr = test_df[index]
-            curr["pred"] = pred_batch[j]
-            curr["model_outputs"] = response_batch[j]
-            res.append(curr)
-        accu, corr, wrong = save_res(res, output_path)
-        logging.info("this batch accu is: {}, corr: {}, wrong: {}\n".format(str(accu), str(corr), str(wrong)))
-        i += batch_size
+    pred_batch, response_batch = batch_inference(llm, sampling_params, inference_batches)
+    res = []
+    for j, curr in enumerate(test_df):
+        curr["pred"] = pred_batch[j]
+        curr["model_outputs"] = response_batch[j]
+        res.append(curr)
+    accu, corr, wrong = save_res(res, output_path)
+    logging.info("this batch accu is: {}, corr: {}, wrong: {}\n".format(str(accu), str(corr), str(wrong)))
+
     accu, corr, wrong = save_res(res, output_path)
     return accu, corr, wrong
 
@@ -303,12 +278,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--ntrain", "-k", type=int, default=5)
     parser.add_argument("--selected_subjects", "-sub", type=str, default="all")
-    parser.add_argument("--ngpu", "-g", type=int, default=1)
     parser.add_argument("--save_dir", "-s", type=str, default="results")
     parser.add_argument("--global_record_file", "-grf", type=str,
                         default="eval_record_collection.csv")
     parser.add_argument("--gpu_util", "-gu", type=str, default="0.8")
-    parser.add_argument("--batch_size", "-bs", type=int, default=1024)
     parser.add_argument("--model", "-m", type=str, default="meta-llama/Llama-2-7b-hf")
 
     args = parser.parse_args()
