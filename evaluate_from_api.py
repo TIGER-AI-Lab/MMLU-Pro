@@ -161,8 +161,8 @@ def extract_again(text):
 
 
 def extract_final(text):
-    pattern = r"[A-J](?=[^A-J]*$)"
-    match = re.search(pattern, text)
+    pattern = r"\b[A-J]\b(?!.*\b[A-J]\b)"
+    match = re.search(pattern, text, re.DOTALL)
     if match:
         return match.group(0)
     else:
