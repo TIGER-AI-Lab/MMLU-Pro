@@ -227,13 +227,7 @@ def main():
         test_df = select_by_category(full_test_df, subject)
         val_df = select_by_category(full_val_df, subject)
         output_path = os.path.join(save_result_dir, "{}.json".format(subject))
-        if os.path.exists(output_path):
-            with open(output_path, "r") as fi:
-                exists_result = json.load(fi)
-        else:
-            exists_result = []
-        acc, corr_count, wrong_count = eval_cot(subject, model, tokenizer, val_df,
-                                                test_df, output_path, exists_result)
+        acc, corr_count, wrong_count = eval_cot(subject, model, tokenizer, val_df, test_df, output_path)
         sta_dict[subject]["corr"] = corr_count
         sta_dict[subject]["wrong"] = wrong_count
         sta_dict[subject]["accu"] = acc
