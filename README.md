@@ -58,6 +58,8 @@ We provide different alternatives to do answer extraction. We found that differe
 python compute_accuracy.py results/llama-3-8b-quantized/CoT/all/
 ```
 
+Thanks to @chibop1 for evaluating the robustness of MMLU-Pro across all the different answer extraction strategies and temperature. A detailed discussion is posted at [Reddit](https://www.reddit.com/r/LocalLLaMA/comments/1e4eyoi/mmlu_pro_how_different_parameters_and_regex/).
+
 ## Contact
 - Yubo Wang: y726wang@uwaterloo.ca
 - Xueguang Ma: x93ma@uwaterloo.ca
