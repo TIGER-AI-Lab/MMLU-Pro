@@ -320,7 +320,6 @@ if __name__ == "__main__":
     parser.add_argument("--assigned_subjects", "-a", type=str, default="all")
     assigned_subjects = []
     args = parser.parse_args()
-    args.model_name = "gpt-4o"
 
     if args.assigned_subjects == "all":
         assigned_subjects = []
