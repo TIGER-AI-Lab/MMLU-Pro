@@ -32,7 +32,7 @@ sh eval_gpt_4.sh
 ## 🏆 Mini-Leaderboard
 | Model                          | Overall Accuracy | 
 |--------------------------------|:----------------:|
-| Claude-3.5-Sonnet              | 72.83            |
+| Claude-3.5-Sonnet              | 76.12            |
 | GPT-4o                         | 72.55            | 
 | Gemini-1.5-Pro                 | 69.03            |
 | Claude-3-Opus                  | 68.45            |
