@@ -92,7 +92,7 @@ def call_api(client, instruction, inputs):
             temperature=0.0,
             top_p=1,
         )
-        result = message.content[0]
+        result = message.content[0].text
     else:
         print("For other model API calls, please implement the request method yourself.")
         result = None
