@@ -10,8 +10,9 @@ from tqdm import tqdm
 import time
 from datasets import load_dataset
 import argparse
+import requests
 
-API_KEY = "Put your api key here"
+API_KEY = ""
 
 
 def get_client():
@@ -55,6 +56,13 @@ def get_client():
         client = anthropic.Anthropic(
             api_key=API_KEY,
         )
+    elif args.model_name == 'reflection':
+        url = "https://api.hyperbolic.xyz/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}"
+        }
+        client = {'url': url, 'headers': headers}
     else:
         client = None
         print("For other model API calls, please implement the client definition method yourself.")
@@ -93,6 +101,25 @@ def call_api(client, instruction, inputs):
             top_p=1,
         )
         result = message.content[0].text
+    elif args.model_name in ['reflection']:
+        data = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a world-class AI system, capable of complex reasoning and reflection. Reason through the query inside <thinking> tags, and then provide your final response inside <output> tags. If you detect that you made a mistake in your reasoning at any point, correct yourself inside <reflection> tags."
+                },
+                {
+                    "role": "user",
+                    "content": instruction + inputs
+                }
+            ],
+            "model": "mattshumer/Reflection-Llama-3.1-70B",
+            "max_tokens": 1024,
+            "temperature": 0.0,
+            "top_p": 0.9
+        }
+        response = requests.post(client['url'], headers=client['headers'], json=data)
+        result = response.json()['choices'][0]['message']['content']
     else:
         print("For other model API calls, please implement the request method yourself.")
         result = None
@@ -190,7 +217,6 @@ def single_request(client, single_question, cot_examples_dict, exist_result):
     try:
         start = time.time()
         response = call_api(client, prompt, input_text)
-        print("requesting gpt 4 costs: ", time.time() - start)
     except Exception as e:
         print("error", e)
         return None, None, exist
@@ -257,8 +283,6 @@ def evaluate(subjects):
             label = each["answer"]
             category = subject
             pred, response, exist = single_request(client, each, dev_df, res)
-            # if exist:
-            #     continue
             if response is not None:
                 res, category_record = update_result(output_res_path)
                 if category not in category_record:
@@ -316,7 +340,8 @@ if __name__ == "__main__":
     parser.add_argument("--model_name", "-m", type=str, default="gpt-4",
                         choices=["gpt-4", "gpt-4o", "deepseek-chat", "deepseek-coder",
                                  "gemini-1.5-flash-latest", "gemini-1.5-pro-latest",
-                                 "claude-3-opus-20240229", "claude-3-sonnet-20240229"])
+                                 "claude-3-opus-20240229", "claude-3-sonnet-20240229",
+                                 "reflection"])
     parser.add_argument("--assigned_subjects", "-a", type=str, default="all")
     assigned_subjects = []
     args = parser.parse_args()
