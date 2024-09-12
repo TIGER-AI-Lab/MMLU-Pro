@@ -16,7 +16,7 @@ API_KEY = ""
 
 
 def get_client():
-    if args.model_name in ["gpt-4", "gpt-4o"]:
+    if args.model_name in ["gpt-4", "gpt-4o", "o1-preview"]:
         openai.api_key = API_KEY
         client = openai
     elif args.model_name in ["deepseek-chat", "deepseek-coder"]:
@@ -56,13 +56,6 @@ def get_client():
         client = anthropic.Anthropic(
             api_key=API_KEY,
         )
-    elif args.model_name == 'reflection':
-        url = "https://api.hyperbolic.xyz/v1/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}"
-        }
-        client = {'url': url, 'headers': headers}
     else:
         client = None
         print("For other model API calls, please implement the client definition method yourself.")
@@ -81,7 +74,13 @@ def call_api(client, instruction, inputs):
           top_p=1,
           frequency_penalty=0,
           presence_penalty=0,
-          stop=None
+        )
+        result = completion.choices[0].message.content
+    elif args.model_name in ["o1-preview"]:
+        message_text = [{"role": "user", "content": instruction + inputs}]
+        completion = client.chat.completions.create(
+          model=args.model_name,
+          messages=message_text,
         )
         result = completion.choices[0].message.content
     elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]:
@@ -101,25 +100,6 @@ def call_api(client, instruction, inputs):
             top_p=1,
         )
         result = message.content[0].text
-    elif args.model_name in ['reflection']:
-        data = {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a world-class AI system, capable of complex reasoning and reflection. Reason through the query inside <thinking> tags, and then provide your final response inside <output> tags. If you detect that you made a mistake in your reasoning at any point, correct yourself inside <reflection> tags."
-                },
-                {
-                    "role": "user",
-                    "content": instruction + inputs
-                }
-            ],
-            "model": "mattshumer/Reflection-Llama-3.1-70B",
-            "max_tokens": 1024,
-            "temperature": 0.0,
-            "top_p": 0.9
-        }
-        response = requests.post(client['url'], headers=client['headers'], json=data)
-        result = response.json()['choices'][0]['message']['content']
     else:
         print("For other model API calls, please implement the request method yourself.")
         result = None
@@ -215,8 +195,8 @@ def single_request(client, single_question, cot_examples_dict, exist_result):
         prompt += format_example(each["question"], each["options"], each["cot_content"])
     input_text = format_example(question, options)
     try:
-        start = time.time()
         response = call_api(client, prompt, input_text)
+        response = response.replace('**', '')
     except Exception as e:
         print("error", e)
         return None, None, exist
@@ -242,7 +222,6 @@ def update_result(output_res_path):
                             x = random.randint(0, len(each["options"]) - 1)
                             if x == each["answer_index"]:
                                 category_record[category]["corr"] += 1
-                                # print("random hit.")
                             else:
                                 category_record[category]["wrong"] += 1
                         elif each["pred"] == each["answer"]:
@@ -338,10 +317,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", "-o", type=str, default="eval_results/")
     parser.add_argument("--model_name", "-m", type=str, default="gpt-4",
-                        choices=["gpt-4", "gpt-4o", "deepseek-chat", "deepseek-coder",
-                                 "gemini-1.5-flash-latest", "gemini-1.5-pro-latest",
-                                 "claude-3-opus-20240229", "claude-3-sonnet-20240229",
-                                 "reflection"])
+                        choices=["gpt-4", "gpt-4o", "o1-preview",
+                                 "deepseek-chat", "deepseek-coder",
+                                 "gemini-1.5-flash-latest",
+                                 "gemini-1.5-pro-latest",
+                                 "claude-3-opus-20240229",
+                                 "claude-3-sonnet-20240229"])
     parser.add_argument("--assigned_subjects", "-a", type=str, default="all")
     assigned_subjects = []
     args = parser.parse_args()
@@ -352,5 +333,3 @@ if __name__ == "__main__":
         assigned_subjects = args.assigned_subjects.split(",")
     os.makedirs(args.output_dir, exist_ok=True)
     evaluate(assigned_subjects)
-
-
