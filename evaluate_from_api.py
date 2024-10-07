@@ -21,7 +21,7 @@ def get_client():
         client = openai
     elif args.model_name in ["deepseek-chat", "deepseek-coder"]:
         client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com/")
-    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]:
+    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash-8b"]:
         genai.configure(api_key=API_KEY)
         generation_config = {
             "temperature": 0.0,
@@ -83,7 +83,7 @@ def call_api(client, instruction, inputs):
           messages=message_text,
         )
         result = completion.choices[0].message.content
-    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]:
+    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash-8b"]:
         chat_session = client.start_chat(
             history=[]
         )
@@ -322,6 +322,7 @@ if __name__ == "__main__":
                                  "gemini-1.5-flash-latest",
                                  "gemini-1.5-pro-latest",
                                  "claude-3-opus-20240229",
+                                 "gemini-1.5-flash-8b",
                                  "claude-3-sonnet-20240229"])
     parser.add_argument("--assigned_subjects", "-a", type=str, default="all")
     assigned_subjects = []
