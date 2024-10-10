@@ -1,0 +1,75 @@
+We employed 4 types of initial prompts and 6 types of example formats, resulting in a combination of 24 different prompt styles. This was done to test the impact of prompt variations on model performance in MMLU-Pro, thereby verifying the robustness of MMLU-Pro.
+
+Four types of initial prompts:
+
+1. Please read the following multiple-choice questions and provide the most likely correct answer based on the options given.
+2. You are an expert in {subject}. Below is a series of example questions (with answers) about {subject} for demonstration. You will be given a question at the end, after the examples, for you to answer. Think it step by step, and give your answer at the end.
+3. The following are multiple choice questions (with answers) about {subject}.
+4. You are a helpful assistant. Below is a series of example questions (with answers) about {subject} for demonstration. You will be given a question at the end, after the examples, for you to answer. First give step-by-step reasoning about how to solve the question. Then output the answer.
+
+
+Six types of example formats:
+----------------------
+example format:  1
+
+Question: The quantum efficiency of a photon detector is 0.1. If 100 photons are sent into the detector, one after the other, the detector will detect photons
+Options:
+(A) an average of 10 times, with an rms deviation of about 4
+(B) an average of 10 times, with an rms deviation of about 3
+(C) an average of 10 times, with an rms deviation of about 1
+(D) an average of 10 times, with an rms deviation of about 0.1
+
+Correct Answer:
+----------------------
+example format:  2
+
+**Question**: The quantum efficiency of a photon detector is 0.1. If 100 photons are sent into the detector, one after the other, the detector will detect photons
+Options:
+(A) an average of 10 times, with an rms deviation of about 4
+(B) an average of 10 times, with an rms deviation of about 3
+(C) an average of 10 times, with an rms deviation of about 1
+(D) an average of 10 times, with an rms deviation of about 0.1
+
+**Correct Answer**:
+----------------------
+example format:  3
+
+Q: The quantum efficiency of a photon detector is 0.1. If 100 photons are sent into the detector, one after the other, the detector will detect photons
+Options:
+(A) an average of 10 times, with an rms deviation of about 4
+(B) an average of 10 times, with an rms deviation of about 3
+(C) an average of 10 times, with an rms deviation of about 1
+(D) an average of 10 times, with an rms deviation of about 0.1
+
+The Best Choice: 
+----------------------
+example format:  4
+
+Question:
+The quantum efficiency of a photon detector is 0.1. If 100 photons are sent into the detector, one after the other, the detector will detect photons A) an average of 10 times, with an rms deviation of about 4, B) an average of 10 times, with an rms deviation of about 3, C) an average of 10 times, with an rms deviation of about 1, D) an average of 10 times, with an rms deviation of about 0.1, 
+The most likely option is 
+----------------------
+example format:  5
+
+Question: The quantum efficiency of a photon detector is 0.1. If 100 photons are sent into the detector, one after the other, the detector will detect photons
+Options:
+A. an average of 10 times, with an rms deviation of about 4
+B. an average of 10 times, with an rms deviation of about 3
+C. an average of 10 times, with an rms deviation of about 1
+D. an average of 10 times, with an rms deviation of about 0.1
+
+Your choice: 
+----------------------
+example format:  6
+
+**Question**: The quantum efficiency of a photon detector is 0.1. If 100 photons are sent into the detector, one after the other, the detector will detect photons (A) an average of 10 times, with an rms deviation of about 4 (B) an average of 10 times, with an rms deviation of about 3 (C) an average of 10 times, with an rms deviation of about 1 (D) an average of 10 times, with an rms deviation of about 0.1 
+**Answer**:
+----------------------
+
+
+
+
+
+
+
+
