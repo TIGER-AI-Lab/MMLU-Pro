@@ -11,6 +11,9 @@ Our experimental results show that MMLU-Pro not only raises the challenge, causi
 
 <img width="1432" alt="abs" src="https://github.com/TIGER-AI-Lab/MMLU-Pro/assets/20929360/8e369fc2-5b6b-4bab-8a44-9e222e742027">
 
+## Updates
+**October 10, 2024**: Added the 24 tested prompt styles from the paper to the repository.
+
 ## Dataset Creation
 MMLU-Pro was created to provide language models with a more challenging and robust benchmark, pushing the boundaries of what these models can achieve in terms of expert-level knowledge and reasoning. Please refer to our huggingface [**🤗 Dataset**](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro) for more details.
 
