@@ -11,6 +11,9 @@ import time
 from datasets import load_dataset
 import argparse
 import requests
+from ai21 import AI21Client
+from ai21.models.chat import ChatMessage, ResponseFormat, DocumentSchema, FunctionToolDefinition
+from ai21.models.chat import ToolDefinition, ToolParameters
 
 API_KEY = ""
 
@@ -21,7 +24,8 @@ def get_client():
         client = openai
     elif args.model_name in ["deepseek-chat", "deepseek-coder"]:
         client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com/")
-    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash-8b"]:
+    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest",
+                             "gemini-1.5-flash-8b", "gemini-002-pro", "gemini-002-flash"]:
         genai.configure(api_key=API_KEY)
         generation_config = {
             "temperature": 0.0,
@@ -56,6 +60,8 @@ def get_client():
         client = anthropic.Anthropic(
             api_key=API_KEY,
         )
+    elif args.model_name in ["jamba-1.5-large"]:
+        client = AI21Client(api_key=API_KEY)
     else:
         client = None
         print("For other model API calls, please implement the client definition method yourself.")
@@ -100,6 +106,21 @@ def call_api(client, instruction, inputs):
             top_p=1,
         )
         result = message.content[0].text
+    elif args.model_name in ["jamba-1.5-large"]:
+        message_text = [ChatMessage(content=instruction + inputs, role="user")]
+        completion = client.chat.completions.create(
+            model=args.model_name,
+            messages=message_text,
+            documents=[],
+            tools=[],
+            n=1,
+            max_tokens=2048,
+            temperature=0,
+            top_p=1,
+            stop=[],
+            response_format=ResponseFormat(type="text"),
+        )
+        result = completion.choices[0].message.content
     else:
         print("For other model API calls, please implement the request method yourself.")
         result = None
@@ -323,7 +344,9 @@ if __name__ == "__main__":
                                  "gemini-1.5-pro-latest",
                                  "claude-3-opus-20240229",
                                  "gemini-1.5-flash-8b",
-                                 "claude-3-sonnet-20240229"])
+                                 "claude-3-sonnet-20240229",
+                                 "gemini-002-pro",
+                                 "gemini-002-flash"])
     parser.add_argument("--assigned_subjects", "-a", type=str, default="all")
     assigned_subjects = []
     args = parser.parse_args()
