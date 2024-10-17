@@ -63,7 +63,7 @@ def get_client():
     elif args.model_name in ["jamba-1.5-large"]:
         client = AI21Client(api_key=API_KEY)
     elif args.model_name in ["iask"]:
-        client = {"Authorization": "Bearer s6LCMv_qfyRP0X8P6xejG8Kp_iwLBtotwXM352IdHNw"}
+        client = {"Authorization": "Bearer " + API_KEY}
     else:
         client = None
         print("For other model API calls, please implement the client definition method yourself.")
@@ -353,7 +353,7 @@ def save_summary(category_record, output_summary_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", "-o", type=str, default="eval_results/")
-    parser.add_argument("--model_name", "-m", type=str, default="iask",
+    parser.add_argument("--model_name", "-m", type=str, default="gpt-4o",
                         choices=["gpt-4", "gpt-4o", "o1-preview",
                                  "deepseek-chat", "deepseek-coder",
                                  "gemini-1.5-flash-latest",
