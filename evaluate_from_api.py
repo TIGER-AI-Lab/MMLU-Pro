@@ -62,6 +62,8 @@ def get_client():
         )
     elif args.model_name in ["jamba-1.5-large"]:
         client = AI21Client(api_key=API_KEY)
+    elif args.model_name in ["iask"]:
+        client = {"Authorization": "Bearer s6LCMv_qfyRP0X8P6xejG8Kp_iwLBtotwXM352IdHNw"}
     else:
         client = None
         print("For other model API calls, please implement the client definition method yourself.")
@@ -121,6 +123,20 @@ def call_api(client, instruction, inputs):
             response_format=ResponseFormat(type="text"),
         )
         result = completion.choices[0].message.content
+    elif args.model_name in ["iask"]:
+        payload = {
+            "prompt": instruction + inputs,
+            "mode": "truth",
+            "detail_level": "detailed",
+            "stream": False
+        }
+        response = requests.post("https://api.iask.ai/v1/query", headers=client, json=payload, timeout=300)
+        if response.status_code != 200:
+            print("API call failed with status code", response.status_code, response.json())
+            return response.json()["response"]["message"]
+        else:
+            result = response.json()["response"]["message"]
+        return result
     else:
         print("For other model API calls, please implement the request method yourself.")
         result = None
@@ -337,7 +353,7 @@ def save_summary(category_record, output_summary_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", "-o", type=str, default="eval_results/")
-    parser.add_argument("--model_name", "-m", type=str, default="gpt-4",
+    parser.add_argument("--model_name", "-m", type=str, default="iask",
                         choices=["gpt-4", "gpt-4o", "o1-preview",
                                  "deepseek-chat", "deepseek-coder",
                                  "gemini-1.5-flash-latest",
