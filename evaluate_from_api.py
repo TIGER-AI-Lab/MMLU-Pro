@@ -62,6 +62,8 @@ def get_client():
         )
     elif args.model_name in ["jamba-1.5-large"]:
         client = AI21Client(api_key=API_KEY)
+    elif args.model_name in ["iask"]:
+        client = {"Authorization": f"Bearer {API_KEY}"}
     else:
         client = None
         print("For other model API calls, please implement the client definition method yourself.")
@@ -121,6 +123,20 @@ def call_api(client, instruction, inputs):
             response_format=ResponseFormat(type="text"),
         )
         result = completion.choices[0].message.content
+    elif args.model_name in ["iask"]:
+        payload = {
+            "prompt": instruction + inputs,
+            "mode": "truth",
+            "detail_level": "detailed",
+            "stream": False
+        }
+        response = requests.post("https://api.iask.ai/v1/query", headers=client, json=payload, timeout=300)
+        if response.status_code != 200:
+            print("API call failed with status code", response.status_code, response.json())
+            return response.json()["response"]["message"]
+        else:
+            result = response.json()["response"]["message"]
+        return result
     else:
         print("For other model API calls, please implement the request method yourself.")
         result = None
