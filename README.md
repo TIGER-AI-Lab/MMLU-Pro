@@ -72,12 +72,10 @@ Thanks to @chibop1 for evaluating the robustness of MMLU-Pro across all the diff
 
 **BibTeX:**
 ```bibtex
-@misc{wang2024mmlupro,
-      title={MMLU-Pro: A More Robust and Challenging Multi-Task Language Understanding Benchmark}, 
-      author={Yubo Wang and Xueguang Ma and Ge Zhang and Yuansheng Ni and Abhranil Chandra and Shiguang Guo and Weiming Ren and Aaran Arulraj and Xuan He and Ziyan Jiang and Tianle Li and Max Ku and Kai Wang and Alex Zhuang and Rongqi Fan and Xiang Yue and Wenhu Chen},
-      year={2024},
-      eprint={2406.01574},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL}
+@article{wang2024mmlu,
+  title={Mmlu-pro: A more robust and challenging multi-task language understanding benchmark},
+  author={Wang, Yubo and Ma, Xueguang and Zhang, Ge and Ni, Yuansheng and Chandra, Abhranil and Guo, Shiguang and Ren, Weiming and Arulraj, Aaran and He, Xuan and Jiang, Ziyan and others},
+  journal={arXiv preprint arXiv:2406.01574},
+  year={2024}
 }
 ```
