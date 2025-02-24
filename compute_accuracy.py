@@ -6,6 +6,7 @@ import random
 
 assert len(sys.argv) > 1, 'You need to pass the directory'
 path = sys.argv[1]
+random.seed(12345)
 
 
 def extract_answer(text, level):
@@ -50,7 +51,6 @@ for name in glob.glob(path + '/*'):
         for e in entries:
             pred = extract_answer(e['model_outputs'], 'l1')
             if pred is None:
-                random.seed(12345)
                 pred = random.choice(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
             # Remove the None cases
             if pred == e['answer']:
@@ -66,7 +66,6 @@ for name in glob.glob(path + '/*'):
         for e in entries:
             pred = extract_answer(e['model_outputs'], 'l2')
             if pred is None:
-                random.seed(12345)
                 pred = random.choice(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
             # Remove the None cases
             if pred == e['answer']:
