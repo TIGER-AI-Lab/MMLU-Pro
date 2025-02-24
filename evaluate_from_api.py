@@ -16,7 +16,7 @@ from ai21.models.chat import ChatMessage, ResponseFormat, DocumentSchema, Functi
 from ai21.models.chat import ToolDefinition, ToolParameters
 
 API_KEY = ""
-
+random.seed(12345)
 
 def get_client():
     if args.model_name in ["gpt-4", "gpt-4o", "o1-preview"]:
@@ -255,7 +255,6 @@ def update_result(output_res_path):
                         if category not in category_record:
                             category_record[category] = {"corr": 0.0, "wrong": 0.0}
                         if not each["pred"]:
-                            random.seed(12345)
                             x = random.randint(0, len(each["options"]) - 1)
                             if x == each["answer_index"]:
                                 category_record[category]["corr"] += 1
