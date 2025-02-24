@@ -16,7 +16,7 @@ from datasets import load_dataset
 choices = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"]
 max_model_length = 4096
 max_new_tokens = 2048
-
+random.seed(12345)
 
 def load_mmlu_pro():
     dataset = load_dataset("TIGER-Lab/MMLU-Pro")
@@ -144,7 +144,6 @@ def save_res(res, output_path):
         fo.write(json.dumps(res))
     for each in res:
         if not each["pred"]:
-            random.seed(12345)
             x = random.randint(0, len(each["options"]) - 1)
             if x == each["answer_index"]:
                 corr += 1
