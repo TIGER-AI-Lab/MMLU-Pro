@@ -1,4 +1,5 @@
 import os
+import concurrent.futures
 import openai
 from openai import OpenAI
 import anthropic
@@ -15,6 +16,7 @@ import requests
 API_KEY = os.getenv("API_KEY")
 BASE_URL = os.getenv("BASE_URL")
 MAX_TOKENS = int(os.getenv("MAX_TOKENS"))
+NUM_THREADS=int(os.getenv("NUM_THREADS"))
 random.seed(12345)
 
 def get_client():
@@ -358,6 +360,82 @@ def save_summary(category_record, output_summary_path):
         fo.write(json.dumps(category_record))
 
 
+def parallel_run(subjects):
+    """
+    Parallel version of the evaluation. Instead of calling `single_request` one by one,
+    we use ThreadPoolExecutor to dispatch multiple calls concurrently.
+    """
+    client = get_client()
+    test_df, dev_df = load_mmlu_pro()
+
+    # If not specified, run all subjects
+    if not subjects:
+        subjects = list(test_df.keys())
+
+    print("assigned subjects", subjects)
+
+    for subject in subjects:
+        test_data = test_df[subject]
+
+        # output files
+        output_res_path = os.path.join(args.output_dir, subject + "_result.json")
+        output_summary_path = os.path.join(args.output_dir, subject + "_summary.json")
+
+        # Load existing results from disk; compute partial stats
+        existing_results, category_record = update_result(output_res_path)
+
+        # For concurrency stats, ensure subject in category_record
+        if subject not in category_record:
+            category_record[subject] = {"corr": 0.0, "wrong": 0.0}
+
+        # Filter out questions that already exist in results
+        questions_to_process = []
+        existing_question_ids = set(
+            (r["question_id"], r["question"]) for r in existing_results
+        )
+
+        for each in test_data:
+            key = (each["question_id"], each["question"])
+            if key not in existing_question_ids:
+                questions_to_process.append(each)
+
+        # --- Worker function for parallel calls ---
+        def worker(question_item):
+            # Returns (question_item, pred, response, exist)
+            pred, response, exist = single_request(client, question_item, dev_df, existing_results)
+            return (question_item, pred, response, exist)
+
+        # We run the calls in parallel
+        # Adjust max_workers as you see fit (watch out for rate limits)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
+            # Map the worker to each question
+            future_to_question = {
+                executor.submit(worker, q): q for q in questions_to_process
+            }
+
+            # As results complete, update in memory
+            for future in tqdm(concurrent.futures.as_completed(future_to_question),
+                               total=len(questions_to_process),
+                               desc=f"Processing {subject}"):
+                question_item, pred, response, exist = future.result()
+
+                # If the API returned something new, record it:
+                if (response is not None) and (exist is False):
+                    question_item["pred"] = pred
+                    question_item["model_outputs"] = response
+                    # Merge into in-memory `existing_results`
+                    merge_result(existing_results, question_item)
+
+                    # Update correct/wrong counters
+                    if pred is not None and pred == question_item["answer"]:
+                        category_record[subject]["corr"] += 1
+                    else:
+                        category_record[subject]["wrong"] += 1
+
+        # All parallel calls are done; now save final results
+        save_res(existing_results, output_res_path)
+        save_summary(category_record, output_summary_path)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", "-o", type=str, default="eval_results/")
@@ -371,4 +449,5 @@ if __name__ == "__main__":
     else:
         assigned_subjects = args.assigned_subjects.split(",")
     os.makedirs(args.output_dir, exist_ok=True)
-    evaluate(assigned_subjects)
+    parallel_run(assigned_subjects)
+    # evaluate(assigned_subjects)
