@@ -11,11 +11,10 @@ import time
 from datasets import load_dataset
 import argparse
 import requests
-from ai21 import AI21Client
-from ai21.models.chat import ChatMessage, ResponseFormat, DocumentSchema, FunctionToolDefinition
-from ai21.models.chat import ToolDefinition, ToolParameters
 
-API_KEY = ""
+API_KEY = os.getenv("API_KEY")
+BASE_URL = os.getenv("BASE_URL")
+MAX_TOKENS = int(os.getenv("MAX_TOKENS"))
 random.seed(12345)
 
 def get_client():
@@ -24,8 +23,9 @@ def get_client():
         client = openai
     elif args.model_name in ["deepseek-chat", "deepseek-coder"]:
         client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com/")
-    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest",
-                             "gemini-1.5-flash-8b", "gemini-002-pro", "gemini-002-flash"]:
+    elif "deepseek-r1" in args.model_name.lower():
+        client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+    elif args.model_name in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash-8b", "gemini-002-pro", "gemini-002-flash"]:
         genai.configure(api_key=API_KEY)
         generation_config = {
             "temperature": 0.0,
@@ -60,8 +60,6 @@ def get_client():
         client = anthropic.Anthropic(
             api_key=API_KEY,
         )
-    elif args.model_name in ["jamba-1.5-large"]:
-        client = AI21Client(api_key=API_KEY)
     elif args.model_name in ["iask"]:
         client = {"Authorization": f"Bearer {API_KEY}"}
     else:
@@ -84,6 +82,31 @@ def call_api(client, instruction, inputs):
           presence_penalty=0,
         )
         result = completion.choices[0].message.content
+    elif "deepseek-r1" in args.model_name.lower():
+        message_text = [{"role": "user", "content": instruction + inputs}]
+        completion = client.chat.completions.create(
+            model=args.model_name,
+            messages=message_text,
+            temperature=0.6,
+            top_p=0.95,
+            stream=True,
+            max_tokens=MAX_TOKENS,
+        )
+        reasoning_content = ""
+        content = ""
+        for chunk in completion:
+            # Extract the delta from choices[0]
+            delta = chunk.choices[0].delta
+
+            # If there is a reasoning_content field, add it to the accumulator.
+            # (It is assumed that either "reasoning_content" or "content" will be provided per chunk.)
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
+                reasoning_content += delta.reasoning_content
+            # Otherwise, if there's a content field, add it both to the accumulator and to the file.
+            elif hasattr(delta, "content") and delta.content:
+                text = delta.content
+                content += text
+        result = content
     elif args.model_name in ["o1-preview"]:
         message_text = [{"role": "user", "content": instruction + inputs}]
         completion = client.chat.completions.create(
@@ -108,21 +131,6 @@ def call_api(client, instruction, inputs):
             top_p=1,
         )
         result = message.content[0].text
-    elif args.model_name in ["jamba-1.5-large"]:
-        message_text = [ChatMessage(content=instruction + inputs, role="user")]
-        completion = client.chat.completions.create(
-            model=args.model_name,
-            messages=message_text,
-            documents=[],
-            tools=[],
-            n=1,
-            max_tokens=2048,
-            temperature=0,
-            top_p=1,
-            stop=[],
-            response_format=ResponseFormat(type="text"),
-        )
-        result = completion.choices[0].message.content
     elif args.model_name in ["iask"]:
         payload = {
             "prompt": instruction + inputs,
@@ -228,8 +236,9 @@ def single_request(client, single_question, cot_examples_dict, exist_result):
     prompt = "The following are multiple choice questions (with answers) about {}. Think step by" \
              " step and then output the answer in the format of \"The answer is (X)\" at the end.\n\n" \
         .format(category)
-    for each in cot_examples:
-        prompt += format_example(each["question"], each["options"], each["cot_content"])
+    # make zero-shot
+    # for each in cot_examples:
+    #     prompt += format_example(each["question"], each["options"], each["cot_content"])
     input_text = format_example(question, options)
     try:
         response = call_api(client, prompt, input_text)
@@ -352,16 +361,7 @@ def save_summary(category_record, output_summary_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", "-o", type=str, default="eval_results/")
-    parser.add_argument("--model_name", "-m", type=str, default="gpt-4",
-                        choices=["gpt-4", "gpt-4o", "o1-preview",
-                                 "deepseek-chat", "deepseek-coder",
-                                 "gemini-1.5-flash-latest",
-                                 "gemini-1.5-pro-latest",
-                                 "claude-3-opus-20240229",
-                                 "gemini-1.5-flash-8b",
-                                 "claude-3-sonnet-20240229",
-                                 "gemini-002-pro",
-                                 "gemini-002-flash"])
+    parser.add_argument("--model_name", "-m", type=str, default="gpt-4")
     parser.add_argument("--assigned_subjects", "-a", type=str, default="all")
     assigned_subjects = []
     args = parser.parse_args()
