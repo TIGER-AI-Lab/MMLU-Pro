@@ -32,7 +32,7 @@ def extract_again(text):
         return match.group(1)
     else:
         return extract_final(text)
-    
+
 
 def extract_final(text):
     pattern = r"\b[A-J]\b(?!.*\b[A-J]\b)"
@@ -43,7 +43,11 @@ def extract_final(text):
         return None
 
 
+all_acc = []
 for name in glob.glob(path + '/*'):
+    if "summary" in name:
+        continue
+
     print('Level 1 regex' + '==' * 20)
     succ, fail = 0, 0
     with open(name, 'r') as f:
@@ -58,20 +62,23 @@ for name in glob.glob(path + '/*'):
             else:
                 fail += 1
     print(name, succ / (succ + fail))
+    all_acc.append(succ / (succ + fail))
 
-    print('Level 2 regex' + '==' * 20)
-    succ, fail = 0, 0
-    with open(name, 'r') as f:
-        entries = json.load(f)
-        for e in entries:
-            pred = extract_answer(e['model_outputs'], 'l2')
-            if pred is None:
-                pred = random.choice(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
-            # Remove the None cases
-            if pred == e['answer']:
-                succ += 1
-            else:
-                fail += 1
-    print(name, succ / (succ + fail))
-    
+    # print('Level 2 regex' + '==' * 20)
+    # succ, fail = 0, 0
+    # with open(name, 'r') as f:
+    #     entries = json.load(f)
+    #     for e in entries:
+    #         pred = extract_answer(e['model_outputs'], 'l2')
+    #         if pred is None:
+    #             pred = random.choice(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
+    #         # Remove the None cases
+    #         if pred == e['answer']:
+    #             succ += 1
+    #         else:
+    #             fail += 1
+    # print(name, succ / (succ + fail))
+
     print()
+
+print("average accuracy: ", sum(all_acc) / len(all_acc))
