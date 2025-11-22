@@ -8,6 +8,7 @@ import transformers
 import time
 import re
 from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 from tqdm import tqdm
 import logging
 import sys
@@ -30,11 +31,21 @@ def load_model():
     llm = LLM(model=args.model, gpu_memory_utilization=float(args.gpu_util),
                 tensor_parallel_size=torch.cuda.device_count(),
                 max_model_len=max_model_length,
-                trust_remote_code=True)
+                trust_remote_code=True,
+                enable_lora=True if args.lora_path else False)
     sampling_params = SamplingParams(temperature=0, max_tokens=max_new_tokens,
                                         stop=["Question:"])
     tokenizer = transformers.AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    return (llm, sampling_params), tokenizer
+
+    lora_request = None
+    if args.lora_path:
+        lora_request = LoRARequest(
+            lora_name="lora",
+            lora_path=args.lora_path,
+            lora_int_id=1
+        )
+
+    return (llm, sampling_params, lora_request), tokenizer
 
 
 def preprocess(test_df):
@@ -124,9 +135,9 @@ def extract_final(text):
         return None
 
 
-def batch_inference(llm, sampling_params, inference_batch):
+def batch_inference(llm, sampling_params, lora_request, inference_batch):
     start = time.time()
-    outputs = llm.generate(inference_batch, sampling_params)
+    outputs = llm.generate(inference_batch, sampling_params, lora_request=lora_request)
     logging.info(str(len(inference_batch)) + "size batch costing time: " + str(time.time() - start))
     response_batch = []
     pred_batch = []
@@ -162,7 +173,7 @@ def save_res(res, output_path):
 
 @torch.no_grad()
 def eval_cot(subject, model, tokenizer, val_df, test_df, output_path):
-    llm, sampling_params = model
+    llm, sampling_params, lora_request = model
     global choices
     logging.info("evaluating " + subject)
     inference_batches = []
@@ -182,7 +193,7 @@ def eval_cot(subject, model, tokenizer, val_df, test_df, output_path):
             k -= 1
         inference_batches.append(prompt)
 
-    pred_batch, response_batch = batch_inference(llm, sampling_params, inference_batches)
+    pred_batch, response_batch = batch_inference(llm, sampling_params, lora_request, inference_batches)
     res = []
     for j, curr in enumerate(test_df):
         curr["pred"] = pred_batch[j]
@@ -258,8 +269,11 @@ if __name__ == "__main__":
                         default="eval_record_collection.csv")
     parser.add_argument("--gpu_util", "-gu", type=str, default="0.8")
     parser.add_argument("--model", "-m", type=str, default="meta-llama/Llama-2-7b-hf")
+    parser.add_argument("--lora_path", "-lp", type=str, default=None)
 
     args = parser.parse_args()
+    if args.lora_path and not os.path.exists(args.lora_path):
+        raise ValueError(f"LoRA path {args.lora_path} does not exist.")
     os.makedirs(args.save_dir, exist_ok=True)
     global_record_file = args.global_record_file
     save_result_dir = os.path.join(
