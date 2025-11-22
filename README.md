@@ -32,6 +32,20 @@ To use the API for inference, modify the API KEY in evaluate_from_api.py script 
 cd scripts/examples/
 sh eval_gpt_4.sh
 ```
+
+To use universal (OpenAI chat.completions) API for inference in multithread mode, modify the API KEY in evaluate_from_apiX.py script and execute:
+```bash
+python evaluate_from_apiX.py --url "http://127.0.0.1:8001/v1" -m "MiniMax-M2" -n 48 -o "eval_results/" execute:
+```
+where --url - API url (possibly local)
+      --model_name - model to pick from api url
+      --num_workers - number of workers to run at the same time
+      --output_dir - directory to put answers to
+
+To check wrong answers - browse results (potentially changing directory with answers str = "eval_results/") 
+```bash
+python evalshowpro.py
+```
 ## 🏆 Mini-Leaderboard
 | Model                          | Overall Accuracy | 
 |--------------------------------|:----------------:|
