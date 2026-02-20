@@ -59,7 +59,7 @@ class GeminiClient:
             config={
                 "temperature": 1.0,
                 "top_p": 0.95,
-                "max_output_tokens": 16000,
+                "max_output_tokens": 32000,
             },
         )
         if response.text is None:
