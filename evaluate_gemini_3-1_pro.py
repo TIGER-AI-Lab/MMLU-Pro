@@ -58,8 +58,8 @@ class GeminiClient:
             contents=prompt,
             config={
                 "temperature": 0.7,
-                "top_p": 1.0,
-                "max_output_tokens": 4000,
+                "top_p": 0.95,
+                "max_output_tokens": 16000,
             },
         )
         if response.text is None:
