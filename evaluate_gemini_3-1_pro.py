@@ -5,16 +5,16 @@ Supports multi-process sharding and resume.
 
 Usage:
     # Single process:
-    python eval_mmlu_pro.py --output_dir eval_results
+    python evaluate_gemini_3-1_pro.py --output_dir eval_results
 
     # Multi-process (e.g., 4 shards, run in separate terminals):
-    python eval_mmlu_pro.py -o eval_results --num_shards 4 --shard_id 0
-    python eval_mmlu_pro.py -o eval_results --num_shards 4 --shard_id 1
-    python eval_mmlu_pro.py -o eval_results --num_shards 4 --shard_id 2
-    python eval_mmlu_pro.py -o eval_results --num_shards 4 --shard_id 3
+    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --shard_id 0
+    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --shard_id 1
+    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --shard_id 2
+    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --shard_id 3
 
     # Merge all shard results and print summary:
-    python eval_mmlu_pro.py -o eval_results --num_shards 4 --merge
+    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --merge
 """
 
 import os

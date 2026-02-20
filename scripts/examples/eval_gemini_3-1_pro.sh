@@ -8,8 +8,6 @@
 
 set -euo pipefail
 
-cd ../..
-
 NUM_SHARDS=20
 OUTPUT_DIR="eval_results"
 SCRIPT="evaluate_gemini_3-1_pro.py"
@@ -27,6 +25,22 @@ if [ -z "${GOOGLE_API_KEY:-}" ]; then
     echo "❌ ERROR: GOOGLE_API_KEY is not set."
     exit 1
 fi
+
+# ── Fix: use a user-writable HF cache directory ──
+export HF_HOME="${HOME}/.cache/huggingface"
+export HF_DATASETS_CACHE="${HF_HOME}/datasets"
+mkdir -p "$HF_DATASETS_CACHE"
+echo "📁 HF cache: ${HF_HOME}"
+
+# ── Fix: pre-download dataset before parallel launch ──
+echo "📥 Pre-downloading MMLU-Pro dataset (single process)..."
+python -c "
+from datasets import load_dataset
+ds = load_dataset('TIGER-Lab/MMLU-Pro')
+print(f'  Test: {len(ds[\"test\"])} examples')
+print(f'  Validation: {len(ds[\"validation\"])} examples')
+print('  ✅ Dataset cached.')
+"
 
 # Launch all shards in background
 PIDS=()
