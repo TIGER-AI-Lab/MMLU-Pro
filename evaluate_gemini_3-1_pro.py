@@ -57,7 +57,7 @@ class GeminiClient:
             model=self.model,
             contents=prompt,
             config={
-                "temperature": 0.0,
+                "temperature": 0.7,
                 "top_p": 1.0,
                 "max_output_tokens": 4000,
             },
