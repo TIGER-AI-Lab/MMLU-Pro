@@ -8,10 +8,10 @@
 
 set -euo pipefail
 
-NUM_SHARDS=20
+NUM_SHARDS=50
 OUTPUT_DIR="eval_results"
 SCRIPT="evaluate_gemini_3-1_pro.py"
-LOG_DIR="${OUTPUT_DIR}/logs"
+LOG_DIR="${OUTPUT_DIR}/logs_gemini_3-1_pro"
 
 mkdir -p "$LOG_DIR"
 

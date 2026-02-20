@@ -4,17 +4,20 @@ Evaluate gemini-3.1-pro-preview on MMLU-Pro benchmark.
 Supports multi-process sharding and resume.
 
 Usage:
+    # Download dataset to local first:
+    python evaluate_gemini_3-1_pro.py --download --data_dir mmlu_pro_data
+
     # Single process:
-    python evaluate_gemini_3-1_pro.py --output_dir eval_results
+    python evaluate_gemini_3-1_pro.py --data_dir mmlu_pro_data --output_dir eval_results
 
     # Multi-process (e.g., 4 shards, run in separate terminals):
-    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --shard_id 0
-    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --shard_id 1
-    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --shard_id 2
-    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 4 --shard_id 3
+    python evaluate_gemini_3-1_pro.py --data_dir mmlu_pro_data -o eval_results --num_shards 4 --shard_id 0
+    python evaluate_gemini_3-1_pro.py --data_dir mmlu_pro_data -o eval_results --num_shards 4 --shard_id 1
+    python evaluate_gemini_3-1_pro.py --data_dir mmlu_pro_data -o eval_results --num_shards 4 --shard_id 2
+    python evaluate_gemini_3-1_pro.py --data_dir mmlu_pro_data -o eval_results --num_shards 4 --shard_id 3
 
     # Merge all shard results and print summary:
-    python evaluate_gemini_3-1_pro.py -o eval_results --num_shards 20 --merge
+    python evaluate_gemini_3-1_pro.py --data_dir mmlu_pro_data -o eval_results --num_shards 20 --merge
 """
 
 import os
@@ -25,7 +28,6 @@ import time
 import argparse
 import logging
 from tqdm import tqdm
-from datasets import load_dataset
 from google import genai
 
 random.seed(12345)
@@ -37,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gemini-3.1-pro-preview"
 MAX_RETRIES = 5
+MAX_FORMAT_RETRIES = 3  # 针对未匹配到 "The answer is" 的重试次数
 
 
 # ─── Gemini Client ───────────────────────────────────────────────────────────
@@ -66,12 +69,59 @@ class GeminiClient:
         return response.text
 
 
-# ─── Data Loading (reused) ───────────────────────────────────────────────────
+# ─── Data Download & Local Loading ───────────────────────────────────────────
 
-def load_mmlu_pro():
+def download_mmlu_pro(data_dir: str):
+    """Download MMLU-Pro from HuggingFace and save as local JSON files."""
+    from datasets import load_dataset
+
+    os.makedirs(data_dir, exist_ok=True)
+    logger.info("Downloading MMLU-Pro dataset from HuggingFace...")
     dataset = load_dataset("TIGER-Lab/MMLU-Pro")
-    test_df = preprocess(dataset["test"])
-    val_df = preprocess(dataset["validation"])
+
+    test_path = os.path.join(data_dir, "test.json")
+    val_path = os.path.join(data_dir, "validation.json")
+
+    test_data = [dict(item) for item in dataset["test"]]
+    val_data = [dict(item) for item in dataset["validation"]]
+
+    with open(test_path, "w", encoding="utf-8") as f:
+        json.dump(test_data, f, ensure_ascii=False)
+    logger.info(f"Saved {len(test_data)} test samples to {test_path}")
+
+    with open(val_path, "w", encoding="utf-8") as f:
+        json.dump(val_data, f, ensure_ascii=False)
+    logger.info(f"Saved {len(val_data)} validation samples to {val_path}")
+
+    logger.info("Download complete.")
+
+
+def load_mmlu_pro_local(data_dir: str):
+    """Load MMLU-Pro from local JSON files."""
+    test_path = os.path.join(data_dir, "test.json")
+    val_path = os.path.join(data_dir, "validation.json")
+
+    if not os.path.exists(test_path) or not os.path.exists(val_path):
+        raise FileNotFoundError(
+            f"Local data not found in '{data_dir}'. "
+            f"Please run with --download first to download the dataset."
+        )
+
+    logger.info(f"Loading test data from {test_path}...")
+    with open(test_path, "r", encoding="utf-8") as f:
+        test_raw = json.load(f)
+
+    logger.info(f"Loading validation data from {val_path}...")
+    with open(val_path, "r", encoding="utf-8") as f:
+        val_raw = json.load(f)
+
+    test_df = preprocess(test_raw)
+    val_df = preprocess(val_raw)
+
+    logger.info(
+        f"Loaded {sum(len(v) for v in test_df.values())} test questions, "
+        f"{sum(len(v) for v in val_df.values())} validation questions"
+    )
     return test_df, val_df
 
 
@@ -88,7 +138,7 @@ def preprocess(df):
     return res
 
 
-# ─── Prompt Formatting (reused) ─────────────────────────────────────────────
+# ─── Prompt Formatting ──────────────────────────────────────────────────────
 
 def format_example(question, options, cot_content=""):
     if cot_content == "":
@@ -119,7 +169,38 @@ def build_prompt(question_data, cot_examples):
     return prompt
 
 
-# ─── Answer Extraction (reused) ─────────────────────────────────────────────
+def build_retry_prompt(question_data, cot_examples, previous_response):
+    """构建重试 prompt，强调必须以 'The answer is (X)' 格式结尾。"""
+    category = question_data["category"]
+    prompt = (
+        f"The following are multiple choice questions (with answers) about "
+        f"{category}. Think step by step and then output the answer in the "
+        f"format of \"The answer is (X)\" at the end.\n\n"
+        f"**IMPORTANT: You MUST end your response with exactly "
+        f"\"The answer is (X)\" where X is one of the option letters "
+        f"(A, B, C, D, etc.). This is mandatory. Do NOT omit this.**\n\n"
+    )
+    for ex in cot_examples:
+        prompt += format_example(ex["question"], ex["options"], ex["cot_content"])
+    prompt += format_example(question_data["question"], question_data["options"])
+
+    prompt += (
+        f"\n\n[Your previous response did not end with \"The answer is (X)\". "
+        f"Here was your previous response for reference:]\n"
+        f"{previous_response}\n\n"
+        f"[Please re-answer the question above. You MUST conclude your response "
+        f"with \"The answer is (X)\" where X is the correct option letter.]\n"
+        f"Answer: "
+    )
+    return prompt
+
+
+# ─── Answer Extraction ──────────────────────────────────────────────────────
+
+def has_answer_is_pattern(text: str) -> bool:
+    """检查回复中是否包含 'The answer is (X)' 模式。支持前面有换行等任意字符。"""
+    return bool(re.search(r"[Tt]he answer is \(?[A-J]\)?", text))
+
 
 def extract_answer(text):
     # Level 1: "answer is (X)" or "answer is X"
@@ -137,7 +218,80 @@ def extract_answer(text):
     return None
 
 
-# ─── Result I/O (reused) ────────────────────────────────────────────────────
+# ─── API Call with Format Retry ─────────────────────────────────────────────
+
+def call_api_with_retries(client, prompt, qid):
+    """调用 API，带指数退避重试。"""
+    for attempt in range(MAX_RETRIES):
+        try:
+            start = time.time()
+            response = client.get_response(prompt)
+            response = response.replace("**", "")
+            elapsed = time.time() - start
+            logger.debug(f"API call for {qid} took {elapsed:.2f}s")
+            return response
+        except Exception as e:
+            wait = min(2 ** attempt, 60)
+            logger.warning(
+                f"API error (attempt {attempt + 1}/{MAX_RETRIES}): {e}. "
+                f"Retrying in {wait}s..."
+            )
+            time.sleep(wait)
+    return None
+
+
+def get_response_with_format_retry(client, question_data, cot_examples, qid,
+                                   previous_response=None):
+    """
+    调用模型获取回复。如果回复中没有匹配到 'The answer is (X)' 的模式，
+    则使用强调格式的 prompt 进行重试，最多重试 MAX_FORMAT_RETRIES 次。
+
+    如果提供了 previous_response（例如从 resume 中读取的旧结果），
+    则直接从格式重试开始，跳过首次正常调用。
+    """
+    if previous_response is not None:
+        # 直接从格式重试开始（resume 场景）
+        response = previous_response
+        logger.info(f"Question {qid}: resuming with format retry (previous output lacks pattern)")
+    else:
+        # 第一次正常调用
+        prompt = build_prompt(question_data, cot_examples)
+        response = call_api_with_retries(client, prompt, qid)
+
+        if response is None:
+            return None
+
+        if has_answer_is_pattern(response):
+            return response
+
+    # 没有匹配到，进行格式重试
+    for retry in range(MAX_FORMAT_RETRIES):
+        logger.warning(
+            f"Question {qid}: response missing 'The answer is (X)' pattern. "
+            f"Format retry {retry + 1}/{MAX_FORMAT_RETRIES}..."
+        )
+        retry_prompt = build_retry_prompt(
+            question_data, cot_examples, response
+        )
+        response = call_api_with_retries(client, retry_prompt, qid)
+
+        if response is None:
+            return None
+
+        if has_answer_is_pattern(response):
+            logger.info(
+                f"Question {qid}: format retry {retry + 1} succeeded."
+            )
+            return response
+
+    logger.warning(
+        f"Question {qid}: all {MAX_FORMAT_RETRIES} format retries exhausted. "
+        f"Using last response for fallback extraction."
+    )
+    return response
+
+
+# ─── Result I/O ─────────────────────────────────────────────────────────────
 
 def load_result(path):
     if os.path.exists(path):
@@ -150,21 +304,20 @@ def load_result(path):
 
 
 def save_res(res, path):
-    """Save results with deduplication by question_id."""
-    seen = set()
-    deduped = []
+    """Save results with deduplication by question_id. Keeps the LAST occurrence
+    so that re-processed results overwrite old ones."""
+    seen = {}
     for each in res:
         qid = each["question_id"]
-        if qid not in seen:
-            seen.add(qid)
-            deduped.append(each)
+        seen[qid] = each  # later entries overwrite earlier ones
+    deduped = list(seen.values())
     with open(path, "w") as f:
         json.dump(deduped, f, ensure_ascii=False)
 
 
 def compute_summary(results):
     """Compute per-category and overall accuracy."""
-    rng = random.Random(12345)  # isolated RNG for reproducible random guessing
+    rng = random.Random(12345)
     category_record = {}
     for each in results:
         cat = each["category"]
@@ -172,7 +325,6 @@ def compute_summary(results):
             category_record[cat] = {"corr": 0.0, "wrong": 0.0}
         pred = each.get("pred")
         if not pred:
-            # Random guess for failed extractions
             x = rng.randint(0, len(each["options"]) - 1)
             if x == each["answer_index"]:
                 category_record[cat]["corr"] += 1
@@ -213,8 +365,8 @@ def get_shard_dir(args):
 def evaluate(args):
     client = GeminiClient(model=args.model)
     logger.info(f"Model: {args.model}")
-    logger.info("Loading MMLU-Pro dataset...")
-    test_df, dev_df = load_mmlu_pro()
+    logger.info(f"Loading MMLU-Pro dataset from local directory: {args.data_dir}")
+    test_df, dev_df = load_mmlu_pro_local(args.data_dir)
 
     # Determine subjects
     if args.assigned_subjects == "all":
@@ -232,7 +384,7 @@ def evaluate(args):
             all_questions.append(q)
     logger.info(f"Total questions: {len(all_questions)} across {len(subjects)} subjects")
 
-    # Shard assignment: each process handles questions where index % num_shards == shard_id
+    # Shard assignment
     shard_questions = [
         q for i, q in enumerate(all_questions)
         if i % args.num_shards == args.shard_id
@@ -246,53 +398,70 @@ def evaluate(args):
     shard_dir = get_shard_dir(args)
     os.makedirs(shard_dir, exist_ok=True)
 
-    # Load existing results for resume
-    processed_ids = set()
+    # ── Load existing results for resume ──
+    # 分为两类：
+    #   1. 已有结果且 model_outputs 包含 "The answer is" → 跳过
+    #   2. 已有结果但 model_outputs 不包含 "The answer is" → 需要重试
+    processed_ids = set()          # 已完成且格式正确，可跳过
+    needs_format_retry = {}        # qid -> old model_outputs，需要重新处理
     results_by_subject = {}
+
     for subject in subjects:
         res_path = os.path.join(shard_dir, f"{subject}_result.json")
         existing = load_result(res_path)
-        results_by_subject[subject] = existing
+        kept = []
         for r in existing:
-            processed_ids.add(r["question_id"])
+            qid = r["question_id"]
+            model_output = r.get("model_outputs", "")
+            if has_answer_is_pattern(model_output):
+                # 格式正确，保留并标记为已处理
+                processed_ids.add(qid)
+                kept.append(r)
+            else:
+                # 格式不正确，记录旧输出用于重试，不加入 processed_ids
+                needs_format_retry[qid] = model_output
+                logger.info(
+                    f"Question {qid} ({subject}): previous output lacks "
+                    f"'The answer is (X)' pattern, will re-process."
+                )
+                # 不加入 kept，后面重新处理后会追加新结果
+        results_by_subject[subject] = kept
 
     skipped = sum(1 for q in shard_questions if q["question_id"] in processed_ids)
-    logger.info(f"Resume: {skipped} already processed, {len(shard_questions) - skipped} remaining")
+    retry_count = sum(
+        1 for q in shard_questions if q["question_id"] in needs_format_retry
+    )
+    remaining = len(shard_questions) - skipped
+    logger.info(
+        f"Resume: {skipped} already done (format OK), "
+        f"{retry_count} need format retry, "
+        f"{remaining - retry_count} new. "
+        f"Total to process: {remaining}"
+    )
 
     # Process questions
     new_count = 0
+
     for q in tqdm(shard_questions, desc=f"Shard {args.shard_id}"):
         qid = q["question_id"]
         subject = q["category"]
 
-        # Skip already processed (resume)
+        # Skip already processed with correct format
         if qid in processed_ids:
             continue
 
-        # Build prompt with CoT few-shot examples from validation set
         cot_examples = dev_df.get(subject, [])
-        prompt = build_prompt(q, cot_examples)
 
-        # Call API with exponential backoff
-        response = None
-        for attempt in range(MAX_RETRIES):
-            try:
-                start = time.time()
-                response = client.get_response(prompt)
-                response = response.replace("**", "")
-                elapsed = time.time() - start
-                logger.debug(f"API call for {qid} took {elapsed:.2f}s")
-                break
-            except Exception as e:
-                wait = min(2 ** attempt, 60)
-                logger.warning(
-                    f"API error (attempt {attempt + 1}/{MAX_RETRIES}): {e}. "
-                    f"Retrying in {wait}s..."
-                )
-                time.sleep(wait)
+        # 判断是全新的还是需要格式重试的
+        previous_output = needs_format_retry.get(qid, None)
+
+        response = get_response_with_format_retry(
+            client, q, cot_examples, qid,
+            previous_response=previous_output,
+        )
 
         if response is None:
-            logger.error(f"Failed after {MAX_RETRIES} retries for question {qid}, skipping.")
+            logger.error(f"Failed after all retries for question {qid}, skipping.")
             continue
 
         pred = extract_answer(response)
@@ -308,7 +477,7 @@ def evaluate(args):
         processed_ids.add(qid)
         new_count += 1
 
-        # Save after each question for robustness
+        # Save after each question (save_res keeps last occurrence → overwrites old)
         save_res(
             results_by_subject[subject],
             os.path.join(shard_dir, f"{subject}_result.json"),
@@ -333,7 +502,7 @@ def evaluate(args):
     n = int(total["corr"] + total["wrong"])
     logger.info(
         f"Shard {args.shard_id} complete. "
-        f"Processed {new_count} new questions. "
+        f"Processed {new_count} new/retried questions. "
         f"Accuracy: {total['acc']:.4f} ({int(total['corr'])}/{n})"
     )
 
@@ -361,16 +530,15 @@ def merge_shards(args):
     merged_dir = os.path.join(args.output_dir, "merged")
     os.makedirs(merged_dir, exist_ok=True)
 
-    # Deduplicate and collect for summary
     all_merged = []
     for subject in sorted(all_results_by_subject.keys()):
         res = all_results_by_subject[subject]
         save_res(res, os.path.join(merged_dir, f"{subject}_result.json"))
-        seen = set()
+        # Deduplicate for summary (save_res keeps last, replicate here)
+        seen = {}
         for r in res:
-            if r["question_id"] not in seen:
-                seen.add(r["question_id"])
-                all_merged.append(r)
+            seen[r["question_id"]] = r
+        all_merged.extend(seen.values())
 
     summary = compute_summary(all_merged)
     save_summary(summary, os.path.join(merged_dir, "summary.json"))
@@ -409,6 +577,10 @@ if __name__ == "__main__":
         help="Base output directory for results",
     )
     parser.add_argument(
+        "--data_dir", "-d", type=str, default="mmlu_pro_data/",
+        help="Local directory for MMLU-Pro data (default: mmlu_pro_data/)",
+    )
+    parser.add_argument(
         "--model", "-m", type=str, default=DEFAULT_MODEL,
         help=f"Gemini model name (default: {DEFAULT_MODEL})",
     )
@@ -428,9 +600,15 @@ if __name__ == "__main__":
         "--merge", action="store_true",
         help="Merge results from all shards instead of evaluating",
     )
+    parser.add_argument(
+        "--download", action="store_true",
+        help="Download MMLU-Pro dataset to local data_dir and exit",
+    )
     args = parser.parse_args()
 
-    if args.merge:
+    if args.download:
+        download_mmlu_pro(args.data_dir)
+    elif args.merge:
         merge_shards(args)
     else:
         if args.shard_id < 0 or args.shard_id >= args.num_shards:
