@@ -12,7 +12,7 @@ cd ../..
 
 NUM_SHARDS=20
 OUTPUT_DIR="eval_results"
-SCRIPT="eval_mmlu_pro.py"
+SCRIPT="evaluate_gemini_3-1_pro.py"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
 mkdir -p "$LOG_DIR"
