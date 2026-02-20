@@ -8,7 +8,7 @@
 
 set -euo pipefail
 # model_outputs_gemini-3.1-pro_0shots.zip
-NUM_SHARDS=20
+NUM_SHARDS=50
 OUTPUT_DIR="eval_results"
 SCRIPT="evaluate_gemini_3-1_pro_0shot.py"
 LOG_DIR="${OUTPUT_DIR}/logs"
