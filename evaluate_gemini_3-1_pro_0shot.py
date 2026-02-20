@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Evaluate gemini-3.1-pro-preview on MMLU-Pro benchmark.
+Evaluate gemini-3.1-pro-preview on MMLU-Pro benchmark (0-shot).
 Supports multi-process sharding and resume.
 
 Usage:
@@ -66,13 +66,12 @@ class GeminiClient:
         return response.text
 
 
-# ─── Data Loading (reused) ───────────────────────────────────────────────────
+# ─── Data Loading ────────────────────────────────────────────────────────────
 
 def load_mmlu_pro():
     dataset = load_dataset("TIGER-Lab/MMLU-Pro")
     test_df = preprocess(dataset["test"])
-    val_df = preprocess(dataset["validation"])
-    return test_df, val_df
+    return test_df
 
 
 def preprocess(df):
@@ -88,33 +87,24 @@ def preprocess(df):
     return res
 
 
-# ─── Prompt Formatting (reused) ─────────────────────────────────────────────
+# ─── Prompt Formatting (0-shot) ─────────────────────────────────────────────
 
-def format_example(question, options, cot_content=""):
-    if cot_content == "":
-        cot_content = "Let's think step by step."
-    if cot_content.startswith("A: "):
-        cot_content = cot_content[3:]
+def format_example(question, options):
     example = "Question: {}\nOptions: ".format(question)
     choice_map = "ABCDEFGHIJ"
     for i, opt in enumerate(options):
         example += "{}. {}\n".format(choice_map[i], opt)
-    if cot_content == "":
-        example += "Answer: "
-    else:
-        example += "Answer: " + cot_content + "\n\n"
+    example += "Answer: "
     return example
 
 
-def build_prompt(question_data, cot_examples):
+def build_prompt(question_data):
     category = question_data["category"]
     prompt = (
-        f"The following are multiple choice questions (with answers) about "
+        f"The following is a multiple choice question (with answer) about "
         f"{category}. Think step by step and then output the answer in the "
         f"format of \"The answer is (X)\" at the end.\n\n"
     )
-    for ex in cot_examples:
-        prompt += format_example(ex["question"], ex["options"], ex["cot_content"])
     prompt += format_example(question_data["question"], question_data["options"])
     return prompt
 
@@ -214,7 +204,7 @@ def evaluate(args):
     client = GeminiClient(model=args.model)
     logger.info(f"Model: {args.model}")
     logger.info("Loading MMLU-Pro dataset...")
-    test_df, dev_df = load_mmlu_pro()
+    test_df = load_mmlu_pro()
 
     # Determine subjects
     if args.assigned_subjects == "all":
@@ -269,9 +259,8 @@ def evaluate(args):
         if qid in processed_ids:
             continue
 
-        # Build prompt with CoT few-shot examples from validation set
-        cot_examples = dev_df.get(subject, [])
-        prompt = build_prompt(q, cot_examples)
+        # Build 0-shot prompt (no few-shot examples)
+        prompt = build_prompt(q)
 
         # Call API with exponential backoff
         response = None
@@ -379,7 +368,7 @@ def merge_shards(args):
     total = summary["total"]
     n_total = int(total["corr"] + total["wrong"])
     print(f"\n{'=' * 65}")
-    print(f"  MMLU-Pro Results  —  {args.model}")
+    print(f"  MMLU-Pro Results (0-shot)  —  {args.model}")
     print(f"{'=' * 65}")
     for k in sorted(summary.keys()):
         if k == "total":
@@ -400,7 +389,7 @@ def merge_shards(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Evaluate gemini-3.1-pro-preview on MMLU-Pro",
+        description="Evaluate gemini-3.1-pro-preview on MMLU-Pro (0-shot)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
