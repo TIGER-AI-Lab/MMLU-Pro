@@ -38,8 +38,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gemini-3.1-pro-preview"
-MAX_RETRIES = 10
-MAX_FORMAT_RETRIES = 10  # 针对未匹配到 "The answer is" 的重试次数
+MAX_RETRIES = 2
+MAX_FORMAT_RETRIES = 2  # 针对未匹配到 "The answer is" 的重试次数
 
 
 # ─── Gemini Client ───────────────────────────────────────────────────────────
