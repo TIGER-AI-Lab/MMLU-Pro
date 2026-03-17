@@ -4,6 +4,7 @@ import os
 import glob
 import sys
 import curses
+import argparse
 from typing import List, Dict, Any
 
 class EnhancedQuestionBrowser:
@@ -22,7 +23,7 @@ class EnhancedQuestionBrowser:
 
     def load_questions(self):
         """Load all questions from result files organized by category"""
-        result_files = glob.glob(os.path.join(self.results_dir, "*_result.json"))
+        result_files = glob.glob(os.path.join(self.results_dir, "*_result.json*"))
 
         if not result_files:
             print(f"No result files found in {self.results_dir}")
@@ -66,7 +67,7 @@ class EnhancedQuestionBrowser:
             'model_outputs': '',
             'src': 'Unknown'
         }
-
+        
         cleaned = question.copy()
         for field, default in defaults.items():
             if field in cleaned:
@@ -76,7 +77,7 @@ class EnhancedQuestionBrowser:
                     cleaned[field] = []
             else:
                 cleaned[field] = default
-
+                
         return cleaned
 
     def update_wrong_questions(self):
@@ -135,21 +136,21 @@ class EnhancedQuestionBrowser:
         safe_text = self.safe_get_text(text, "")
         if not safe_text:
             return [""]
-
+        
         # Split into paragraphs first
         paragraphs = safe_text.split('\n')
         wrapped_lines = []
-
+        
         for paragraph in paragraphs:
             paragraph = paragraph.strip()
             if not paragraph:
                 wrapped_lines.append("")
                 continue
-
+                
             words = paragraph.split()
             current_line = []
             current_length = 0
-
+            
             for word in words:
                 word_length = len(word)
                 # If adding this word would exceed width, start a new line
@@ -161,25 +162,25 @@ class EnhancedQuestionBrowser:
                 else:
                     current_line.append(word)
                     current_length += word_length + (1 if current_line else 0)
-
+            
             if current_line:
                 wrapped_lines.append("  " + " ".join(current_line))
-
+        
         return wrapped_lines
 
     def calculate_model_output_pages(self, formatted_lines: List[str], start_row: int) -> int:
         """Calculate total pages for model output based on available screen space"""
         if not formatted_lines:
             return 1
-
+            
         # Calculate available rows for model output (leave space for page info and commands)
         available_rows = curses.LINES - start_row - 6  # More conservative estimate
         if available_rows <= 0:
             available_rows = 1
-
+            
         lines_per_page = available_rows
         total_pages = (len(formatted_lines) + lines_per_page - 1) // lines_per_page
-
+        
         return max(1, total_pages)
 
     def safe_addstr(self, row: int, col: int, text: str, attr=0):
@@ -190,12 +191,12 @@ class EnhancedQuestionBrowser:
                 return row
             if col < 0 or col >= curses.COLS:
                 return row
-
+            
             # Truncate text if it would go beyond screen width
             max_len = curses.COLS - col
             if max_len <= 0:
                 return row
-
+                
             safe_text = self.safe_get_text(text, "")
             display_text = safe_text[:max_len]
             self.stdscr.addstr(row, col, display_text, attr)
@@ -252,37 +253,47 @@ class EnhancedQuestionBrowser:
             # Separator
             self.safe_addstr(2, 0, "=" * min(80, curses.COLS-1), curses.A_BOLD)
 
-            # Current question info
+            # Current question info - COMPACT LAYOUT
             row = 3
             row = self.safe_addstr(row, 0, f"Category: {self.safe_get_text(q.get('category'))}", curses.A_BOLD)
             row = self.safe_addstr(row, 0, f"Question ID: {self.safe_get_text(q.get('question_id'))}")
             row = self.safe_addstr(row, 0, f"Source: {self.safe_get_text(q.get('src'))}")
 
-            # Correct Answer with safe handling
-            row = self.safe_addstr(row, 0, "Correct Answer: ")
+            # Compact layout for answer info
+            answer_line = f"Correct: "
             answer_text = self.safe_get_text(q.get('answer'))
             try:
+                self.stdscr.addstr(answer_line)
                 self.stdscr.addstr(answer_text, curses.color_pair(2))  # Green
             except:
-                self.stdscr.addstr("N/A", curses.color_pair(2))
-            row += 1
-
-            # Model Prediction with safe handling
-            row = self.safe_addstr(row, 0, "Model Prediction: ")
+                self.stdscr.addstr(answer_line + "N/A", curses.color_pair(2))
+            
+            # Add Model Prediction on the same line
+            pred_line = f"  |  Prediction: "
             pred_text = self.safe_get_text(q.get('pred'))
             try:
+                self.stdscr.addstr(pred_line)
                 self.stdscr.addstr(pred_text, curses.color_pair(1))  # Red
             except:
-                self.stdscr.addstr("N/A", curses.color_pair(1))
+                self.stdscr.addstr(pred_line + "N/A", curses.color_pair(1))
+            
+            # Add Answer Index on the same line
+            answer_idx_line = f"  |  Answer Index: {self.safe_get_text(q.get('answer_index'))}"
+            self.stdscr.addstr(answer_idx_line)
             row += 1
 
-            row = self.safe_addstr(row, 0, f"Answer Index: {self.safe_get_text(q.get('answer_index'))}")
-            row += 2
-
-            # Question text
-            question_text = q.get('question', '')
-            row = self.safe_addstr(row, 0, f"Question: {self.truncate_text(question_text, curses.COLS-20)}", curses.A_BOLD | curses.color_pair(3))
+            # Question text - ALWAYS FULLY VISIBLE with wrapping
+            question_text = self.safe_get_text(q.get('question'))
+            row = self.safe_addstr(row, 0, "Question:", curses.A_BOLD | curses.color_pair(3))
             row += 1
+            
+            # Display full question with wrapping
+            wrapped_question = self.wrap_text(question_text, curses.COLS - 2)  # 2 chars for indentation
+            for line in wrapped_question:
+                if row >= curses.LINES - 10:  # Leave room for other content
+                    break
+                row = self.safe_addstr(row, 2, line)  # Indent question text
+            row += 1  # Add space after question
 
             # Options (in one line)
             options = q.get('options', [])
@@ -291,17 +302,13 @@ class EnhancedQuestionBrowser:
                 safe_options = [self.safe_get_text(opt, "Empty option") for opt in options]
                 options_text = " | ".join([f"{i+1}. {opt}" for i, opt in enumerate(safe_options)])
                 row = self.safe_addstr(row, 0, f"Options: {self.truncate_text(options_text, curses.COLS-10)}", curses.A_BOLD)
-                row += 2
-            elif options:
-                # Handle case where options is not a list
-                row = self.safe_addstr(row, 0, f"Options: Invalid format", curses.A_BOLD)
-                row += 2
+                row += 1
 
             # Chain of Thought
             cot = q.get('cot_content', '')
             if cot:
                 row = self.safe_addstr(row, 0, f"Chain of Thought: {self.truncate_text(cot, curses.COLS-25)}", curses.A_BOLD | curses.color_pair(4))
-                row += 2
+                row += 1
 
             # Store the starting row for model output
             model_output_start_row = row
@@ -390,7 +397,7 @@ class EnhancedQuestionBrowser:
         lines = []
         current_line = []
         current_length = 0
-
+        
         for word in words:
             if current_length + len(word) + 1 <= width:
                 current_line.append(word)
@@ -400,29 +407,29 @@ class EnhancedQuestionBrowser:
                     lines.append(" ".join(current_line))
                 current_line = [word]
                 current_length = len(word)
-
+        
         if current_line:
             lines.append(" ".join(current_line))
-
+        
         return lines
 
     def show_category_selection(self):
         """Show category selection with arrow key navigation"""
         options = self.categories + ["ALL CATEGORIES"]
         current_selection = len(options) - 1 if self.current_category == "all" else self.categories.index(self.current_category)
-
+        
         while True:
             self.stdscr.clear()
             self.stdscr.addstr(0, 0, "SELECT CATEGORY (Use ↑/↓ arrows, Enter to select)", curses.A_BOLD | curses.A_UNDERLINE)
-
+            
             stats = self.get_category_stats()
-
+            
             for i, option in enumerate(options):
                 if i == current_selection:
                     self.stdscr.addstr(2 + i, 2, f"> {option}", curses.A_REVERSE)
                 else:
                     self.stdscr.addstr(2 + i, 2, f"  {option}")
-
+                
                 # Add stats for categories
                 if i < len(self.categories):
                     stat = stats[self.categories[i]]
@@ -432,11 +439,11 @@ class EnhancedQuestionBrowser:
                     total_questions = sum(stat['total'] for stat in stats.values())
                     total_accuracy = ((total_questions - total_wrong) / total_questions * 100) if total_questions > 0 else 0
                     self.stdscr.addstr(2 + i, 30, f"{total_wrong}/{total_questions} wrong ({total_accuracy:.1f}% accuracy)")
-
+            
             self.stdscr.refresh()
-
+            
             key = self.stdscr.getch()
-
+            
             if key == curses.KEY_UP:
                 current_selection = (current_selection - 1) % len(options)
             elif key == curses.KEY_DOWN:
@@ -445,13 +452,13 @@ class EnhancedQuestionBrowser:
                 break
             elif key == ord('q') or key == 27:  # q or ESC to cancel
                 return
-
+        
         # Set the selected category
         if current_selection == len(options) - 1:
             self.current_category = "all"
         else:
             self.current_category = self.categories[current_selection]
-
+        
         self.update_wrong_questions()
         self.needs_redraw = True
 
@@ -459,18 +466,18 @@ class EnhancedQuestionBrowser:
         """Search for question by ID"""
         if not self.wrong_questions:
             return
-
+            
         self.stdscr.clear()
         prompt = "SEARCH - Enter question ID: "
         self.stdscr.addstr(0, 0, prompt)
         self.stdscr.refresh()
-
+        
         curses.echo()
         try:
             search_id = self.stdscr.getstr(0, len(prompt), 20).decode('utf-8').strip()
         finally:
             curses.noecho()
-
+        
         if search_id:
             # Search for the question ID in wrong_questions
             found = False
@@ -481,7 +488,7 @@ class EnhancedQuestionBrowser:
                     self.model_output_page = 0  # Reset to first page
                     found = True
                     break
-
+            
             if not found:
                 # Show not found message
                 self.stdscr.clear()
@@ -489,14 +496,14 @@ class EnhancedQuestionBrowser:
                 self.stdscr.addstr(2, 0, "Press any key to continue...")
                 self.stdscr.refresh()
                 self.stdscr.getch()
-
+        
         self.needs_redraw = True
 
     def show_help(self):
         """Show help screen"""
         self.stdscr.clear()
         self.stdscr.addstr(0, 0, "HELP - MMLU-Pro Browser", curses.A_BOLD | curses.A_UNDERLINE)
-
+        
         help_text = [
             "",
             "NAVIGATION:",
@@ -506,7 +513,7 @@ class EnhancedQuestionBrowser:
             "  S        - Search by question ID",
             "",
             "VIEW CONTROLS:",
-            "  ↑ / ↓    - Toggle model output (collapsed) or page through output (expanded)",
+            "  ↑ / ↓    - Toggle model output (collapsed) or page through output (expanded)", 
             "  Q        - Quit",
             "",
             "BOUNDARY INDICATORS:",
@@ -516,10 +523,10 @@ class EnhancedQuestionBrowser:
             "",
             "Press any key to continue..."
         ]
-
+        
         for i, line in enumerate(help_text):
             self.safe_addstr(2 + i, 0, line)
-
+        
         self.stdscr.refresh()
         self.stdscr.getch()
         self.needs_redraw = True
@@ -528,7 +535,7 @@ class EnhancedQuestionBrowser:
         """Handle keypress with curses - with robust bounds checking"""
         try:
             key = self.stdscr.getch()
-
+            
             # Handle navigation keys with strict bounds checking
             if key == curses.KEY_LEFT or key == ord('h'):
                 if self.current_index > 0:
@@ -536,14 +543,14 @@ class EnhancedQuestionBrowser:
                     if self.model_output_expanded:
                         self.model_output_page = 0
                     self.needs_redraw = True
-
+                    
             elif key == curses.KEY_RIGHT or key == ord('l'):
                 if self.current_index < len(self.wrong_questions) - 1:
                     self.current_index += 1
                     if self.model_output_expanded:
                         self.model_output_page = 0
                     self.needs_redraw = True
-
+                    
             elif key == curses.KEY_UP:
                 if self.model_output_expanded:
                     # Page up in model output
@@ -559,7 +566,7 @@ class EnhancedQuestionBrowser:
                     self.model_output_expanded = True
                     self.model_output_page = 0
                     self.needs_redraw = True
-
+                    
             elif key == curses.KEY_DOWN:
                 if self.model_output_expanded:
                     # Page down in model output
@@ -571,7 +578,7 @@ class EnhancedQuestionBrowser:
                     self.model_output_expanded = True
                     self.model_output_page = 0
                     self.needs_redraw = True
-
+                    
             elif key == curses.KEY_PPAGE:  # Page Up
                 new_index = max(0, self.current_index - 10)
                 if new_index != self.current_index:
@@ -579,7 +586,7 @@ class EnhancedQuestionBrowser:
                     if self.model_output_expanded:
                         self.model_output_page = 0
                     self.needs_redraw = True
-
+                    
             elif key == curses.KEY_NPAGE:  # Page Down
                 new_index = min(len(self.wrong_questions) - 1, self.current_index + 10)
                 if new_index != self.current_index:
@@ -587,26 +594,26 @@ class EnhancedQuestionBrowser:
                     if self.model_output_expanded:
                         self.model_output_page = 0
                     self.needs_redraw = True
-
+                    
             elif key == ord('\n') or key == ord('\r'):  # Enter
                 self.show_category_selection()
                 # needs_redraw is set in show_category_selection
-
+                
             elif key == ord('s') or key == ord('S'):
                 self.search_by_id()
                 # needs_redraw is set in search_by_id
-
+                
             elif key == ord('q') or key == ord('Q'):
                 return False
-
+                
             elif key == ord('h') or key == ord('H'):
                 self.show_help()
                 # needs_redraw is set in show_help
-
+                
             # Unknown keys are ignored - no redraw needed
-
+            
             return True
-
+                
         except KeyboardInterrupt:
             return False
         except Exception as e:
@@ -621,13 +628,13 @@ class EnhancedQuestionBrowser:
         curses.cbreak()
         self.stdscr.keypad(True)
         curses.curs_set(0)  # Hide cursor
-
+        
         # Initialize colors
         if curses.has_colors():
             curses.start_color()
             curses.use_default_colors()
             curses.init_pair(1, curses.COLOR_RED, -1)      # Wrong predictions
-            curses.init_pair(2, curses.COLOR_GREEN, -1)    # Correct answers
+            curses.init_pair(2, curses.COLOR_GREEN, -1)    # Correct answers  
             curses.init_pair(3, curses.COLOR_YELLOW, -1)   # Questions
             curses.init_pair(4, curses.COLOR_CYAN, -1)     # Chain of Thought
 
@@ -643,27 +650,27 @@ class EnhancedQuestionBrowser:
         """Main program loop with comprehensive error handling"""
         if not self.load_questions():
             return
-
+        
         if not self.wrong_questions:
             print("No wrong answers found!")
             return
-
+        
         try:
             self.init_curses()
             running = True
-
+            
             # Initial display
             self.display_question()
-
+            
             while running:
                 try:
                     # Only redraw if needed
                     if self.needs_redraw:
                         self.display_question()
-
+                    
                     # Handle keypress (blocking)
                     running = self.handle_keypress()
-
+                        
                 except Exception as e:
                     # Handle any display or keypress errors gracefully
                     self.stdscr.clear()
@@ -671,12 +678,12 @@ class EnhancedQuestionBrowser:
                     self.stdscr.addstr(2, 0, "Attempting to recover...")
                     self.stdscr.refresh()
                     curses.napms(2000)
-
+                    
                     # Reset to safe state but don't jump to first question
                     self._ensure_valid_index()
                     self.needs_redraw = True
                     continue
-
+                    
         except KeyboardInterrupt:
             print("\nReceived interrupt signal, shutting down...")
         except Exception as e:
@@ -685,7 +692,10 @@ class EnhancedQuestionBrowser:
             self.cleanup_curses()
 
 def main():
-    browser = EnhancedQuestionBrowser()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--results-dir", "-r", type=str, default="eval_results/")
+    args = parser.parse_args()
+    browser = EnhancedQuestionBrowser(args.results_dir)
     browser.run()
 
 if __name__ == "__main__":
