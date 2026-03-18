@@ -35,16 +35,24 @@ sh eval_gpt_4.sh
 
 To use universal (OpenAI chat.completions) API for inference in multithread mode, modify the API KEY in evaluate_from_apiX.py script and execute:
 ```bash
-python evaluate_from_apiX.py --url "http://127.0.0.1:8001/v1" -m "MiniMax-M2" -n 48 -o "eval_results/" execute:
+python evaluate_from_apiX.py --url "http://127.0.0.1:8001/v1" -m "MiniMax-M2" -n 48 -o "eval_results/" --retry 2 --max_tokens 82000 --retry_wrong 2
 ```
+
 where --url - API url (possibly local)
+```
       --model_name - model to pick from api url
       --num_workers - number of workers to run at the same time
       --output_dir - directory to put answers to
+      --retry - max token reached retries (useful with hallucinations)
+      --max_tokens - max tokens per question (useful with hallucinations)
+      --retry_wrong - retries on wrong answer (useful with hallucinations and testing)
+      --rerun-maxtoken - run questions that reached max tokens earlier
+      --rerun-unknown - run questions that received no answers earlier
+```
 
 To check wrong answers - browse results (potentially changing directory with answers str = "eval_results/") 
 ```bash
-python evalshowpro.py
+python evalshowpro.py -r eval_results/
 ```
 ## 🏆 Mini-Leaderboard
 | Model                          | Overall Accuracy | 
