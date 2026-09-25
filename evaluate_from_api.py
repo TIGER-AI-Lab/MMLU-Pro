@@ -236,7 +236,7 @@ def single_request(client, single_question, cot_examples_dict, exist_result):
         response = response.replace('**', '')
     except Exception as e:
         print("error", e)
-        return None, None, exist
+        return "error", "API call failed: {}".format(e), exist
     pred = extract_answer(response)
     return pred, response, exist
 
